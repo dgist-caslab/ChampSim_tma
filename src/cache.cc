@@ -32,6 +32,9 @@
 #include "util/span.h"
 #include <fmt/core.h>
 
+// [PHW]temporal
+#include <iostream>
+
 CACHE::tag_lookup_type::tag_lookup_type(request_type req, bool local_pref, bool skip)
     : address(req.address), v_address(req.v_address), data(req.data), ip(req.ip), instr_id(req.instr_id), pf_metadata(req.pf_metadata), cpu(req.cpu),
       type(req.type), prefetch_from_this(local_pref), skip_fill(skip), is_translated(req.is_translated), instr_depend_on_me(req.instr_depend_on_me)
@@ -120,8 +123,15 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
         fmt::print("[{}] {} evict address: {:#x} v_address: {:#x} prefetch_metadata: {}\n", NAME,
             __func__, writeback_packet.address, writeback_packet.v_address, fill_mshr.pf_metadata);
       }
-
-      success = lower_level->add_wq(writeback_packet);
+      if(this->NAME == "LLC"){
+        if(writeback_packet.address > fast_boundary){
+          success = lower_level_slow->add_wq(writeback_packet);
+        }else{
+          success = lower_level->add_wq(writeback_packet);
+        }
+      }else{
+        success = lower_level->add_wq(writeback_packet);
+      }
     }
 
     if (success) {
@@ -266,10 +276,19 @@ bool CACHE::handle_miss(const tag_lookup_type& handle_pkt)
     fwd_pkt.response_requested = (!handle_pkt.prefetch_from_this || !handle_pkt.skip_fill);
 
     bool success;
-    if (prefetch_as_load || handle_pkt.type != access_type::PREFETCH)
-      success = lower_level->add_rq(fwd_pkt);
-    else
-      success = lower_level->add_pq(fwd_pkt);
+    if (prefetch_as_load || handle_pkt.type != access_type::PREFETCH){
+      if(this->NAME == "LLC" && handle_pkt.address > fast_boundary){
+        success = lower_level_slow->add_rq(fwd_pkt);
+      }else{
+        success = lower_level->add_rq(fwd_pkt);
+      }
+    }else{
+      if(this->NAME == "LLC" && handle_pkt.address > fast_boundary){
+        success = lower_level_slow->add_pq(fwd_pkt);
+      }else{
+        success = lower_level->add_pq(fwd_pkt);
+      }
+    }
 
     if (!success) {
       if constexpr (champsim::debug_print) {
@@ -339,8 +358,15 @@ long CACHE::operate()
   std::for_each(std::cbegin(lower_level->returned), std::cend(lower_level->returned), [this](const auto& pkt) { this->finish_packet(pkt); });
   progress += std::distance(std::cbegin(lower_level->returned), std::cend(lower_level->returned));
   lower_level->returned.clear();
+  // [PHW] finish returns from slow memory too
+  if(this->NAME == "LLC"){
+    std::for_each(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned), [this](const auto& pkt) { this->finish_packet(pkt); });
+    progress += std::distance(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned));
+    lower_level_slow->returned.clear();
+  }
 
   // Finish translations
+  // [PHW] LLC don't have translate, ignore this process
   if (lower_translate != nullptr) {
     std::for_each(std::cbegin(lower_translate->returned), std::cend(lower_translate->returned), [this](const auto& pkt) { this->finish_translation(pkt); });
     progress += std::distance(std::cbegin(lower_translate->returned), std::cend(lower_translate->returned));
@@ -674,6 +700,10 @@ void CACHE::initialize()
 {
   impl_prefetcher_initialize();
   impl_initialize_replacement();
+  // [PHW] fast/slow boundary must be set before initializing
+  if(this->NAME == "LLC"){
+    fast_boundary = DRAM_SIZE-1;
+  }
 }
 
 void CACHE::begin_phase()

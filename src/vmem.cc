@@ -23,7 +23,7 @@
 #include "dram_controller.h"
 #include <fmt/core.h>
 
-VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram)
+VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram, MEMORY_CONTROLLER& dram_slow)
     : next_ppage(VMEM_RESERVE_CAPACITY), last_ppage(1ull << (LOG2_PAGE_SIZE + champsim::lg2(page_table_page_size / PTE_BYTES) * page_table_levels)),
       minor_fault_penalty(minor_penalty), pt_levels(page_table_levels), pte_page_size(page_table_page_size)
 {
@@ -34,8 +34,9 @@ VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_tab
   auto required_bits = champsim::lg2(last_ppage);
   if (required_bits > 64)
     fmt::print("WARNING: virtual memory configuration would require {} bits of addressing.\n", required_bits); // LCOV_EXCL_LINE
-  if (required_bits > champsim::lg2(dram.size()))
+  if (required_bits > champsim::lg2(dram.size() + dram_slow.size()))
     fmt::print("WARNING: physical memory size is smaller than virtual memory size.\n"); // LCOV_EXCL_LINE
+
 }
 
 uint64_t VirtualMemory::shamt(std::size_t level) const { return LOG2_PAGE_SIZE + champsim::lg2(pte_page_size / PTE_BYTES) * (level - 1); }

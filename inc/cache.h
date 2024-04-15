@@ -63,6 +63,9 @@ class CACHE : public champsim::operable
   using request_type = typename channel_type::request_type;
   using response_type = typename channel_type::response_type;
 
+  // [PHW] fast/slow boundary
+  uint64_t fast_boundary = 0;
+
   struct tag_lookup_type {
     uint64_t address;
     uint64_t v_address;
@@ -157,6 +160,7 @@ class CACHE : public champsim::operable
 public:
   std::vector<channel_type*> upper_levels;
   channel_type* lower_level;
+  channel_type* lower_level_slow = NULL;
   channel_type* lower_translate;
 
   uint32_t cpu = 0;
@@ -315,6 +319,7 @@ public:
     unsigned m_pref_act_mask{};
     std::vector<CACHE::channel_type*> m_uls{};
     CACHE::channel_type* m_ll{};
+    CACHE::channel_type* m_lls{};
     CACHE::channel_type* m_lt{nullptr};
 
     friend class CACHE;
@@ -324,7 +329,7 @@ public:
         : m_name(other.m_name), m_freq_scale(other.m_freq_scale), m_sets(other.m_sets), m_ways(other.m_ways), m_pq_size(other.m_pq_size),
           m_mshr_size(other.m_mshr_size), m_hit_lat(other.m_hit_lat), m_fill_lat(other.m_fill_lat), m_latency(other.m_latency), m_max_tag(other.m_max_tag),
           m_max_fill(other.m_max_fill), m_offset_bits(other.m_offset_bits), m_pref_load(other.m_pref_load), m_wq_full_addr(other.m_wq_full_addr),
-          m_va_pref(other.m_va_pref), m_pref_act_mask(other.m_pref_act_mask), m_uls(other.m_uls), m_ll(other.m_ll), m_lt(other.m_lt)
+          m_va_pref(other.m_va_pref), m_pref_act_mask(other.m_pref_act_mask), m_uls(other.m_uls), m_ll(other.m_ll), m_lls(other.m_lls), m_lt(other.m_lt)
     {
     }
 
@@ -437,6 +442,11 @@ public:
       m_ll = ll_;
       return *this;
     }
+    self_type& lower_level_slow(CACHE::channel_type* lls_)
+    {
+      m_lls = lls_;
+      return *this;
+    }
     self_type& lower_translate(CACHE::channel_type* lt_)
     {
       m_lt = lt_;
@@ -456,7 +466,7 @@ public:
 
   template <unsigned long long P_FLAG, unsigned long long R_FLAG>
   explicit CACHE(Builder<P_FLAG, R_FLAG> b)
-      : champsim::operable(b.m_freq_scale), upper_levels(std::move(b.m_uls)), lower_level(b.m_ll), lower_translate(b.m_lt), NAME(b.m_name), NUM_SET(b.m_sets),
+      : champsim::operable(b.m_freq_scale), upper_levels(std::move(b.m_uls)), lower_level(b.m_ll), lower_level_slow(b.m_lls), lower_translate(b.m_lt), NAME(b.m_name), NUM_SET(b.m_sets),
         NUM_WAY(b.m_ways), MSHR_SIZE(b.m_mshr_size), PQ_SIZE(b.m_pq_size), HIT_LATENCY((b.m_hit_lat > 0) ? b.m_hit_lat : b.m_latency - b.m_fill_lat),
         FILL_LATENCY(b.m_fill_lat), OFFSET_BITS(b.m_offset_bits), MAX_TAG(b.m_max_tag), MAX_FILL(b.m_max_fill), prefetch_as_load(b.m_pref_load),
         match_offset_bits(b.m_wq_full_addr), virtual_prefetch(b.m_va_pref), pref_activate_mask(b.m_pref_act_mask),

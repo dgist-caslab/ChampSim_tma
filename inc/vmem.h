@@ -49,7 +49,7 @@ public:
   const uint64_t pte_page_size; // Size of a PTE page
 
   // capacity and pg_size are measured in bytes, and capacity must be a multiple of pg_size
-  VirtualMemory(uint64_t pg_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram);
+  VirtualMemory(uint64_t pg_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram, MEMORY_CONTROLLER& dram_slow);
   uint64_t shamt(std::size_t level) const;
   uint64_t get_offset(uint64_t vaddr, std::size_t level) const;
   std::size_t available_ppages() const;

@@ -100,7 +100,6 @@ def dtlb_path(cores, caches):
 
 def list_defaults(cores, caches):
     l1i = list(l1i_path(cores, caches))
-    #print(l1i)
     yield from l1i
     yield from l1d_path(cores, caches)
     yield from itlb_path(cores, caches)

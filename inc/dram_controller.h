@@ -90,12 +90,16 @@ class MEMORY_CONTROLLER : public champsim::operable
   std::vector<channel_type*> queues;
 
   // Latencies
-  const uint64_t tRP, tRCD, tCAS, DRAM_DBUS_TURN_AROUND_TIME, DRAM_DBUS_RETURN_TIME;
+  const uint64_t tRP, tRCD, tCAS, DRAM_DBUS_TURN_AROUND_TIME;
+  uint64_t DRAM_DBUS_RETURN_TIME = 0;
+
+  // [PHW] slow_memory flag
+  int isSlow;
 
   // these values control when to send out a burst of writes
-  constexpr static std::size_t DRAM_WRITE_HIGH_WM = ((DRAM_WQ_SIZE * 7) >> 3);         // 7/8th
-  constexpr static std::size_t DRAM_WRITE_LOW_WM = ((DRAM_WQ_SIZE * 6) >> 3);          // 6/8th
-  constexpr static std::size_t MIN_DRAM_WRITES_PER_SWITCH = ((DRAM_WQ_SIZE * 1) >> 2); // 1/4
+  std::size_t DRAM_WRITE_HIGH_WM;
+  std::size_t DRAM_WRITE_LOW_WM;
+  std::size_t MIN_DRAM_WRITES_PER_SWITCH;
 
   void initiate_requests();
   bool add_rq(const request_type& pkt, champsim::channel* ul);
@@ -104,7 +108,7 @@ class MEMORY_CONTROLLER : public champsim::operable
 public:
   std::array<DRAM_CHANNEL, DRAM_CHANNELS> channels;
 
-  MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround, std::vector<channel_type*>&& ul);
+  MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround, std::vector<channel_type*>&& ul, int is_slow);
 
   void initialize() override final;
   long operate() override final;

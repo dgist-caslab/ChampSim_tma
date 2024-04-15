@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-def get_constants_file(env, pmem):
+def get_constants_file(env, pmem, spmem):
     yield from (
         '#ifndef CHAMPSIM_CONSTANTS_H',
         '#define CHAMPSIM_CONSTANTS_H',
@@ -34,5 +34,18 @@ def get_constants_file(env, pmem):
         'constexpr std::size_t DRAM_CHANNEL_WIDTH = {channel_width};'.format(**pmem),
         'constexpr std::size_t DRAM_WQ_SIZE = {wq_size};'.format(**pmem),
         'constexpr std::size_t DRAM_RQ_SIZE = {rq_size};'.format(**pmem),
+        'constexpr std::size_t DRAM_SIZE = {result};'.format(result=pmem['channels'] * pmem['ranks'] * pmem['banks'] * pmem['rows'] * pmem['columns'] * 64),
+
+        'constexpr uint64_t DRAM_SLOW_IO_FREQ = {io_freq};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_CHANNELS = {channels};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_RANKS = {ranks};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_BANKS = {banks};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_ROWS = {rows};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_COLUMNS = {columns};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_CHANNEL_WIDTH = {channel_width};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_WQ_SIZE = {wq_size};'.format(**spmem),
+        'constexpr std::size_t DRAM_SLOW_RQ_SIZE = {rq_size};'.format(**spmem),
+
+
         '#endif')
 

@@ -24,6 +24,7 @@ from . import util
 default_root = { 'block_size': 64, 'page_size': 4096, 'heartbeat_frequency': 10000000, 'num_cores': 1 }
 default_core = { 'frequency' : 4000 }
 default_pmem = { 'name': 'DRAM', 'frequency': 3200, 'channels': 1, 'ranks': 1, 'banks': 8, 'rows': 65536, 'columns': 128, 'lines_per_column': 8, 'channel_width': 8, 'wq_size': 64, 'rq_size': 64, 'tRP': 12.5, 'tRCD': 12.5, 'tCAS': 12.5, 'turn_around_time': 7.5 }
+default_pmem_slow = { 'name': 'DRAM_SLOW', 'frequency': 3200, 'channels': 1, 'ranks': 1, 'banks': 8, 'rows': 65536, 'columns': 128, 'lines_per_column': 8, 'channel_width': 8, 'wq_size': 64, 'rq_size': 64, 'tRP': 12.5, 'tRCD': 12.5, 'tCAS': 12.5, 'turn_around_time': 7.5 }
 default_vmem = { 'pte_page_size': (1 << 12), 'num_levels': 5, 'minor_fault_penalty': 200 }
 
 cache_deprecation_keys = {
@@ -110,14 +111,15 @@ def normalize_config(config_file):
     cores = [util.chain({n: util.read_element_name(cpu, n) for n in (*pinned_cache_names, 'PTW')}, cpu) for cpu in cores]
 
     # The name 'DRAM' is reserved for the physical memory
-    caches = {k:v for k,v in caches.items() if k != 'DRAM'}
+    caches = {k:v for k,v in caches.items() if k != 'DRAM' or k !='DRAM_SLOW'}
 
-    return cores, caches, ptws, config_file.get('physical_memory', {}), config_file.get('virtual_memory', {})
+    return cores, caches, ptws, config_file.get('physical_memory', {}), config_file.get('physical_slow_memory', {}), config_file.get('virtual_memory', {})
 
-def parse_normalized(cores, caches, ptws, pmem, vmem, merged_configs, branch_context, btb_context, prefetcher_context, replacement_context, compile_all_modules):
+def parse_normalized(cores, caches, ptws, pmem, spmem, vmem, merged_configs, branch_context, btb_context, prefetcher_context, replacement_context, compile_all_modules):
     config_file = util.chain(merged_configs, default_root)
 
     pmem = util.chain(pmem, default_pmem)
+    spmem = util.chain(spmem, default_pmem_slow)
     vmem = util.chain(vmem, default_vmem)
 
     cores = [util.chain(cpu, {'DIB': dict()}, default_core) for cpu in cores]
@@ -161,7 +163,11 @@ def parse_normalized(cores, caches, ptws, pmem, vmem, merged_configs, branch_con
     caches = filter_inaccessible(caches, [cpu[name] for cpu,name in itertools.product(cores, ('ITLB', 'DTLB', 'L1I', 'L1D'))])
 
     pmem['io_freq'] = pmem['frequency'] # Save value
-    scale_frequencies(itertools.chain(cores, caches.values(), ptws.values(), (pmem,)))
+    spmem['io_freq'] = spmem['frequency'] # Save value
+    scale_frequencies(itertools.chain(cores, caches.values(), ptws.values(), (pmem,), (spmem, )))
+
+    # spmem['io_freq'] = spmem['frequency'] # Save value
+    # scale_frequencies(itertools.chain(cores, caches.values(), ptws.values(), (spmem,)))
 
     # TODO can these be removed in favor of the defaults in inc/defaults.hpp?
     # All cores have a default branch predictor and BTB
@@ -191,20 +197,21 @@ def parse_normalized(cores, caches, ptws, pmem, vmem, merged_configs, branch_con
             ({'name': k, '_queue_check_full_addr': c.get('_first_level', False) or c.get('wq_check_full_addr', False)} for k,c in caches.items()),
 
             # The end of the data path is the physical memory
-            ({'name': collections.deque(util.iter_system(caches, cpu['L1I']), maxlen=1)[0]['name'], 'lower_level': 'DRAM'} for cpu in cores),
-            ({'name': collections.deque(util.iter_system(caches, cpu['L1D']), maxlen=1)[0]['name'], 'lower_level': 'DRAM'} for cpu in cores),
+            ({'name': collections.deque(util.iter_system(caches, cpu['L1I']), maxlen=1)[0]['name'], 'lower_level': 'DRAM', 'lower_level_slow': 'DRAM_SLOW'} for cpu in cores),
+            ({'name': collections.deque(util.iter_system(caches, cpu['L1D']), maxlen=1)[0]['name'], 'lower_level': 'DRAM', 'lower_level_slow': 'DRAM_SLOW'} for cpu in cores),
 
             # Get module path names and unique module names
             ({'name': c['name'], '_replacement_data': [replacement_context.find(f) for f in util.wrap_list(c.get('replacement',[]))]} for c in caches.values()),
             ({'name': c['name'], '_prefetcher_data': [util.chain({'_is_instruction_prefetcher': c.get('_is_instruction_cache',False)}, prefetcher_context.find(f)) for f in util.wrap_list(c.get('prefetcher',[]))]} for c in caches.values())
             )
+    # [PHW] slow memory added for LLC's lower level(lower_level_slow)
 
     cores = list(util.combine_named(cores,
             ({'name': c['name'], '_branch_predictor_data': [branch_context.find(f) for f in util.wrap_list(c.get('branch_predictor',[]))]} for c in cores),
             ({'name': c['name'], '_btb_data': [btb_context.find(f) for f in util.wrap_list(c.get('btb',[]))]} for c in cores)
             ).values())
 
-    elements = {'cores': cores, 'caches': tuple(caches.values()), 'ptws': tuple(ptws.values()), 'pmem': pmem, 'vmem': vmem}
+    elements = {'cores': cores, 'caches': tuple(caches.values()), 'ptws': tuple(ptws.values()), 'pmem': pmem, 'spmem':spmem, 'vmem': vmem}
     module_info = {
             'repl': util.combine_named(*(c['_replacement_data'] for c in caches.values()), replacement_context.find_all()),
             'pref': util.combine_named(*(c['_prefetcher_data'] for c in caches.values()), prefetcher_context.find_all()),
@@ -247,6 +254,5 @@ def parse_config(*configs, module_dir=[], branch_dir=[], btb_dir=[], pref_dir=[]
             'branch': {k: util.chain(v, modules.get_branch_data(v['name'])) for k,v in module_info['branch'].items()},
             'btb': {k: util.chain(v, modules.get_btb_data(v['name'])) for k,v in module_info['btb'].items()},
             }
-
     return name, elements, modules_to_compile, module_info, config_file, env
 

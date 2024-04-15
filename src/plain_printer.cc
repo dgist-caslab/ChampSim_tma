@@ -118,6 +118,10 @@ void champsim::plain_printer::print(champsim::phase_stats& stats)
   fmt::print(stream, "\nDRAM Statistics\n");
   for (const auto& stat : stats.roi_dram_stats)
     print(stat);
+
+  fmt::print(stream, "\nSLOW DRAM Statistics\n");
+  for (const auto& stat : stats.roi_slow_dram_stats)
+    print(stat);
 }
 
 void champsim::plain_printer::print(std::vector<phase_stats>& stats)

@@ -129,6 +129,12 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
   std::transform(std::begin(dram.channels), std::end(dram.channels), std::back_inserter(stats.roi_dram_stats),
                  [](const DRAM_CHANNEL& chan) { return chan.roi_stats; });
 
+  auto slow_dram = env.slow_mem_view();
+  std::transform(std::begin(slow_dram.channels), std::end(slow_dram.channels), std::back_inserter(stats.sim_slow_dram_stats),
+                 [](const DRAM_CHANNEL& chan) { return chan.sim_stats; });
+  std::transform(std::begin(slow_dram.channels), std::end(slow_dram.channels), std::back_inserter(stats.roi_slow_dram_stats),
+                 [](const DRAM_CHANNEL& chan) { return chan.roi_stats; });
+
   return stats;
 }
 

@@ -18,8 +18,9 @@ import operator
 
 from . import util
 
-pmem_fmtstr = 'MEMORY_CONTROLLER {name}{{{frequency}, {io_freq}, {tRP}, {tRCD}, {tCAS}, {turn_around_time}, {{{_ulptr}}}}};'
-vmem_fmtstr = 'VirtualMemory vmem{{{pte_page_size}, {num_levels}, {minor_fault_penalty}, {dram_name}}};'
+pmem_fmtstr = 'MEMORY_CONTROLLER {name}{{{frequency}, {io_freq}, {tRP}, {tRCD}, {tCAS}, {turn_around_time}, {{{_ulptr}}}, 0}};'
+spmem_fmtstr = 'MEMORY_CONTROLLER {name}{{{frequency}, {io_freq}, {tRP}, {tRCD}, {tCAS}, {turn_around_time}, {{{_ulptr}}}, 1}};'
+vmem_fmtstr = 'VirtualMemory vmem{{{pte_page_size}, {num_levels}, {minor_fault_penalty}, {dram_name}, {slow_dram_name}}};'
 
 queue_fmtstr = 'champsim::channel {name}{{{rq_size}, {pq_size}, {wq_size}, {_offset_bits}, {_queue_check_full_addr:b}}};'
 
@@ -82,10 +83,11 @@ def vector_string(iterable):
         return hoisted[0]
     return '{'+', '.join(hoisted)+'}'
 
-def get_instantiation_lines(cores, caches, ptws, pmem, vmem):
+def get_instantiation_lines(cores, caches, ptws, pmem, spmem, vmem):
     upper_level_pairs = tuple(itertools.chain(
         ((elem['lower_level'], elem['name']) for elem in ptws),
         ((elem['lower_level'], elem['name']) for elem in caches),
+        ((elem['lower_level_slow'], elem['name']) for elem in caches if 'lower_level_slow' in elem),
         ((elem['lower_translate'], elem['name']) for elem in caches if 'lower_translate' in elem),
         *(((elem['L1I'], elem['name']), (elem['L1D'], elem['name'])) for elem in cores)
     ))
@@ -103,7 +105,15 @@ def get_instantiation_lines(cores, caches, ptws, pmem, vmem):
                     '_offset_bits':'champsim::lg2(BLOCK_SIZE)',
                     '_queue_check_full_addr':False
                 }
+            },
+            {spmem['name']: {
+                'rq_size':'std::numeric_limits<std::size_t>::max()',
+                'wq_size':'std::numeric_limits<std::size_t>::max()',
+                'pq_size':'std::numeric_limits<std::size_t>::max()',
+                '_offset_bits':'champsim::lg2(BLOCK_SIZE)',
+                '_queue_check_full_addr':False
             }
+        }
         )
 
     yield '#include "environment.h"'
@@ -121,7 +131,11 @@ def get_instantiation_lines(cores, caches, ptws, pmem, vmem):
     yield pmem_fmtstr.format(
             _ulptr=vector_string('&{}_to_{}_queues'.format(ul, pmem['name']) for ul in upper_levels[pmem['name']]['uppers']),
             **pmem)
-    yield vmem_fmtstr.format(dram_name=pmem['name'], **vmem)
+    # print(upper_levels[spmem['name']]['uppers'])
+    yield spmem_fmtstr.format(
+            _ulptr=vector_string('&{}_to_{}_queues'.format(ul, spmem['name']) for ul in upper_levels[spmem['name']]['uppers']),
+            **spmem)
+    yield vmem_fmtstr.format(dram_name=pmem['name'], slow_dram_name=spmem['name'], **vmem)
 
     for ptw in ptws:
         yield 'PageTableWalker {name}{{PageTableWalker::Builder{{champsim::defaults::default_ptw}}'.format(**ptw)
@@ -179,6 +193,9 @@ def get_instantiation_lines(cores, caches, ptws, pmem, vmem):
         yield '.upper_levels({{{}}})'.format(vector_string('&{}_to_{}_queues'.format(ul, elem['name']) for ul in upper_levels[elem['name']]['uppers']))
         yield '.lower_level({})'.format('&{}_to_{}_queues'.format(elem['name'], elem['lower_level']))
 
+        if 'lower_level_slow' in elem:
+            yield '.lower_level_slow({})'.format('&{}_to_{}_queues'.format(elem['name'], elem['lower_level_slow']))
+
         if 'lower_translate' in elem:
             yield '.lower_translate({})'.format('&{}_to_{}_queues'.format(elem['name'], elem['lower_translate']))
 
@@ -233,9 +250,12 @@ def get_instantiation_lines(cores, caches, ptws, pmem, vmem):
     yield 'MEMORY_CONTROLLER& dram_view() override {{ return {}; }}'.format(pmem['name'])
     yield ''
 
+    yield 'MEMORY_CONTROLLER& slow_mem_view() override {{ return {}; }}'.format(spmem['name'])
+    yield ''
+
     yield 'std::vector<std::reference_wrapper<champsim::operable>> operable_view() override {'
     yield '  return {'
-    yield '    ' + ', '.join('{name}'.format(**elem) for elem in itertools.chain(cores, ptws, caches, (pmem,)))
+    yield '    ' + ', '.join('{name}'.format(**elem) for elem in itertools.chain(cores, ptws, caches, (pmem,), (spmem,)))
     yield '  };'
     yield '}'
     yield ''
