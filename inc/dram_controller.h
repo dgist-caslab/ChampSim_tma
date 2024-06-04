@@ -68,7 +68,8 @@ struct DRAM_CHANNEL {
     queue_type::iterator pkt;
   };
 
-  using request_array_type = std::array<BANK_REQUEST, DRAM_RANKS * DRAM_BANKS>;
+  // using request_array_type = std::array<BANK_REQUEST, DRAM_SLOW_RANKS * DRAM_BANKS>;
+  using request_array_type = std::array<BANK_REQUEST, 4 * 16>; //[PHW] TODO: make this for dynamic code
   request_array_type bank_request = {};
   request_array_type::iterator active_request = std::end(bank_request);
 

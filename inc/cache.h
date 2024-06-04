@@ -160,7 +160,7 @@ class CACHE : public champsim::operable
 public:
   std::vector<channel_type*> upper_levels;
   channel_type* lower_level;
-  channel_type* lower_level_slow = NULL;
+  channel_type* lower_level_slow;
   channel_type* lower_translate;
 
   uint32_t cpu = 0;

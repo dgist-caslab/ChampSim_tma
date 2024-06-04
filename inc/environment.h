@@ -34,6 +34,7 @@ struct environment {
   virtual std::vector<std::reference_wrapper<PageTableWalker>> ptw_view() = 0;
   virtual MEMORY_CONTROLLER& dram_view() = 0;
   virtual MEMORY_CONTROLLER& slow_mem_view() = 0;
+  virtual VirtualMemory& vmem_view() = 0;
   virtual std::vector<std::reference_wrapper<operable>> operable_view() = 0;
 };
 } // namespace champsim

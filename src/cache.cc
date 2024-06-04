@@ -96,6 +96,7 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
   assert(way <= set_end);
   const auto way_idx = static_cast<std::size_t>(std::distance(set_begin, way)); // cast protected by earlier assertion
 
+  // if (fill_mshr.address > fast_boundary ) {
   if constexpr (champsim::debug_print) {
     fmt::print(
         "[{}] {} instr_id: {} address: {:#x} v_address: {:#x} set: {} way: {} type: {} prefetch_metadata: {} cycle_enqueued: {} cycle: {}\n",
@@ -124,7 +125,7 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
             __func__, writeback_packet.address, writeback_packet.v_address, fill_mshr.pf_metadata);
       }
       if(this->NAME == "LLC"){
-        if(writeback_packet.address > fast_boundary){
+        if(writeback_packet.address > fast_boundary){ // [PHW] is this physical address?? for sure?
           success = lower_level_slow->add_wq(writeback_packet);
         }else{
           success = lower_level->add_wq(writeback_packet);
@@ -136,7 +137,6 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
 
     if (success) {
       auto evicting_address = (ever_seen_data ? way->address : way->v_address) & ~champsim::bitmask(match_offset_bits ? 0 : OFFSET_BITS);
-
       if (way->prefetch)
         ++sim_stats.pf_useless;
 
@@ -151,6 +151,11 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
                                     champsim::to_underlying(fill_mshr.type), false);
 
       way->pf_metadata = metadata_thru;
+
+      if constexpr (champsim::debug_print) {
+        fmt::print("[{}] {} handle_fill success: address: {:#x} v_address: {:#x} way_idx: {}\n", NAME, __func__, fill_mshr.address, fill_mshr.v_address,
+                   way_idx);
+      }
     }
   } else {
     // Bypass
@@ -169,6 +174,13 @@ bool CACHE::handle_fill(const mshr_type& fill_mshr)
     response_type response{fill_mshr.address, fill_mshr.v_address, fill_mshr.data, metadata_thru, fill_mshr.instr_depend_on_me};
     for (auto ret : fill_mshr.to_return)
       ret->push_back(response);
+    if constexpr (champsim::debug_print) {
+      fmt::print("[{}] {} handle_fill completed: address: {:#x} v_address: {:#x}\n", NAME, __func__, fill_mshr.address, fill_mshr.v_address);
+    }
+  }else{
+    if constexpr (champsim::debug_print) {
+      fmt::print("[{}] {} handle_fill failed: address: {:#x} v_address: {:#x}\n", NAME, __func__, fill_mshr.address, fill_mshr.v_address);
+    }
   }
 
   return success;
@@ -276,14 +288,22 @@ bool CACHE::handle_miss(const tag_lookup_type& handle_pkt)
     fwd_pkt.response_requested = (!handle_pkt.prefetch_from_this || !handle_pkt.skip_fill);
 
     bool success;
+
+    if constexpr (champsim::debug_print) {
+    // if(handle_pkt.address > fast_boundary){
+      fmt::print("[{}] {} instr_id: {} address: {:#x} v_address: {:#x} type: {} local_prefetch: {} cycle: {}\n", NAME, __func__, handle_pkt.instr_id,
+                 handle_pkt.address, handle_pkt.v_address, access_type_names.at(champsim::to_underlying(handle_pkt.type)), handle_pkt.prefetch_from_this,
+                 current_cycle);
+    }
     if (prefetch_as_load || handle_pkt.type != access_type::PREFETCH){
-      if(this->NAME == "LLC" && handle_pkt.address > fast_boundary){
+
+      if((this->NAME == "LLC") && (handle_pkt.address > fast_boundary)){
         success = lower_level_slow->add_rq(fwd_pkt);
       }else{
         success = lower_level->add_rq(fwd_pkt);
       }
     }else{
-      if(this->NAME == "LLC" && handle_pkt.address > fast_boundary){
+      if((this->NAME == "LLC") && (handle_pkt.address > fast_boundary)){
         success = lower_level_slow->add_pq(fwd_pkt);
       }else{
         success = lower_level->add_pq(fwd_pkt);
@@ -355,13 +375,28 @@ long CACHE::operate()
     ul->check_collision();
 
   // Finish returns
-  std::for_each(std::cbegin(lower_level->returned), std::cend(lower_level->returned), [this](const auto& pkt) { this->finish_packet(pkt); });
-  progress += std::distance(std::cbegin(lower_level->returned), std::cend(lower_level->returned));
+  std::for_each(std::cbegin(lower_level->returned), std::cend(lower_level->returned), [this](const auto& pkt) { this->finish_packet(pkt);});
+  long tmp_progress = 0;
+  tmp_progress = std::distance(std::cbegin(lower_level->returned), std::cend(lower_level->returned));
+
+  progress += tmp_progress;
   lower_level->returned.clear();
   // [PHW] finish returns from slow memory too
   if(this->NAME == "LLC"){
-    std::for_each(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned), [this](const auto& pkt) { this->finish_packet(pkt); });
-    progress += std::distance(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned));
+    tmp_progress = 0;
+    std::for_each(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned), [this](const auto& pkt) { 
+      this->finish_packet(pkt); 
+      if constexpr (champsim::debug_print) {
+        fmt::print("[{}] {} finish_packet from slow_dram: address: {:#x} v_address: {:#x} data: {:#x}\n", this->NAME, __func__, pkt.address, pkt.v_address, pkt.data);
+      }
+    });
+    tmp_progress = std::distance(std::cbegin(lower_level_slow->returned), std::cend(lower_level_slow->returned));
+    if constexpr (champsim::debug_print) {
+      // if(lower_level_slow->returned.size() > 0){
+        fmt::print("[{}] {} return exist from slow_dram, progress_tmp: {}\n", this->NAME, __func__, tmp_progress);
+      // }
+    }
+    progress += tmp_progress;
     lower_level_slow->returned.clear();
   }
 
@@ -375,10 +410,16 @@ long CACHE::operate()
 
   // Perform fills
   auto fill_bw = MAX_FILL;
+  // p0 target
   for (auto q : {std::ref(MSHR), std::ref(inflight_writes)}) {
     auto [fill_begin, fill_end] =
         champsim::get_span_p(std::cbegin(q.get()), std::cend(q.get()), fill_bw, [cycle = current_cycle](const auto& x) { return x.event_cycle <= cycle; });
-    auto complete_end = std::find_if_not(fill_begin, fill_end, [this](const auto& x) { return this->handle_fill(x); });
+    auto complete_end = std::find_if_not(fill_begin, fill_end, [this](const auto& x) {
+      if constexpr (champsim::debug_print) {
+        fmt::print("[{}] {} instr_id: {} address: {:#x} v_address: {:#x} data: {:#x}\n", this->NAME, __func__, x.instr_id, x.address, x.v_address, x.data);
+      }
+      return this->handle_fill(x); 
+      });
     fill_bw -= std::distance(fill_begin, complete_end);
     q.get().erase(fill_begin, complete_end);
   }
@@ -440,6 +481,9 @@ long CACHE::operate()
         tag_bw_consumed, std::size(inflight_tag_check),
         stash_bandwidth_consumed, std::size(translation_stash),
         channels_bandwidth_consumed, pq_bandwidth_consumed, tag_bw);
+    if( progress == 0){
+      fmt::print("[{}] {} no progress\n", NAME, __func__);
+    }
   }
 
   return progress;
@@ -539,8 +583,15 @@ void CACHE::finish_packet(const response_type& packet)
   mshr_entry->pf_metadata = packet.pf_metadata;
   mshr_entry->event_cycle = current_cycle + (warmup ? 0 : FILL_LATENCY);
 
+  // if( this->NAME == "LLC" && mshr_entry->address > fast_boundary){
+  // if( mshr_entry->address > fast_boundary){
+  // if( this->NAME == "LLC"){
+    // fmt::print("[{}_MSHR] {} instr_id: {} address: {:#x} v_address: {:#x} data: {:#x} type: {} to_finish: {} event: {} current: {}\n", NAME, __func__, mshr_entry->instr_id,
+    //            mshr_entry->address, mshr_entry->v_address, mshr_entry->data, access_type_names.at(champsim::to_underlying(mshr_entry->type)), std::size(lower_level->returned),
+    //            mshr_entry->event_cycle, current_cycle);
+  // }
   if constexpr (champsim::debug_print) {
-    fmt::print("[{}_MSHR] {} instr_id: {} address: {:#x} data: {:#x} type: {} to_finish: {} event: {} current: {}\n", NAME, __func__, mshr_entry->instr_id,
+    fmt::print("[{}_MSHR] {} instr_id: {} address: {:#x} v_address: {:#x} data: {:#x} type: {} to_finish: {} event: {} current: {}\n", NAME, __func__, mshr_entry->instr_id,
                mshr_entry->address, mshr_entry->data, access_type_names.at(champsim::to_underlying(mshr_entry->type)), std::size(lower_level->returned),
                mshr_entry->event_cycle, current_cycle);
   }
@@ -700,10 +751,8 @@ void CACHE::initialize()
 {
   impl_prefetcher_initialize();
   impl_initialize_replacement();
-  // [PHW] fast/slow boundary must be set before initializing
-  if(this->NAME == "LLC"){
-    fast_boundary = DRAM_SIZE-1;
-  }
+  // [PHW] fast/slow boundary must be set in initializing seq
+  fast_boundary = DRAM_SIZE;
 }
 
 void CACHE::begin_phase()

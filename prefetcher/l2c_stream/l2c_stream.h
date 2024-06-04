@@ -4,6 +4,7 @@
 #include "cache.h"
 
 #include <cstdint>
+#include <iostream>
 
 namespace l2c_stream
 {
@@ -12,7 +13,15 @@ namespace l2c_stream
     constexpr std::size_t STREAM_WINDOW = 16;
     constexpr std::size_t PREF_CONFIDENCE = 2;
     constexpr std::size_t PREF_DEGREE = 2;
-    constexpr double PREF_THRESHOLD = 0.8; // 80% of mshr
+    constexpr double PREF_THRESHOLD = 0.5; // 80% of mshr
+
+    typedef struct l2c_stream_stats{
+        uint64_t num_pref;
+        uint64_t num_useful;
+        uint64_t num_to_l2c;
+        uint64_t num_to_llc;
+        double avg_mshr_occupancy_ratio;
+    } l2c_stream_stats_t;
 
     typedef struct stream_buffer{
         uint64_t page;

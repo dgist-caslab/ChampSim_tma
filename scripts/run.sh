@@ -4,7 +4,7 @@ SPEC_TRACE_ROOT=/home/phw/sim/traces/downloads
 LOG_ROOT=/home/phw/workspace/simulator/logs
 
 NUM_WARMUP=100000000    # 1B
-NUM_SIMUL=500000000     # 5B
+NUM_SIMUL=200000000     # 2B
 TRACE=""
 EXP_TIME=`date "+%y%m%d%H%M"`
 
@@ -23,4 +23,6 @@ if [ -n "$3" ]; then
 fi
 
 # execution command
-$SIM_ROOT/bin/champsim --warmup-instructions $NUM_WARMUP --simulation-instructions $NUM_SIMUL $SPEC_TRACE_ROOT/$TRACE 2>&1 | tee $LOG_ROOT/${TRACE}_${EXP_TIME}.log
+$SIM_ROOT/bin/champsim --warmup-instructions $NUM_WARMUP --simulation-instructions $NUM_SIMUL $SPEC_TRACE_ROOT/$TRACE $SPEC_TRACE_ROOT/$TRACE > $LOG_ROOT/${TRACE}_${EXP_TIME}.log 2>&1
+
+

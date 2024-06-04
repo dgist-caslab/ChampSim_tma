@@ -39,6 +39,7 @@ private:
 
   uint64_t next_ppage;
   uint64_t last_ppage;
+  bool flag_slow_alloc = false;
 
   uint64_t ppage_front() const;
   void ppage_pop();
@@ -55,6 +56,7 @@ public:
   std::size_t available_ppages() const;
   std::pair<uint64_t, uint64_t> va_to_pa(uint32_t cpu_num, uint64_t vaddr);
   std::pair<uint64_t, uint64_t> get_pte_pa(uint32_t cpu_num, uint64_t vaddr, std::size_t level);
+  uint64_t get_last_ppage();
 };
 
 #endif

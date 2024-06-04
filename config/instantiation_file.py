@@ -250,7 +250,12 @@ def get_instantiation_lines(cores, caches, ptws, pmem, spmem, vmem):
     yield 'MEMORY_CONTROLLER& dram_view() override {{ return {}; }}'.format(pmem['name'])
     yield ''
 
+    # for slow mem
     yield 'MEMORY_CONTROLLER& slow_mem_view() override {{ return {}; }}'.format(spmem['name'])
+    yield ''
+
+    # for vmem
+    yield 'VirtualMemory& vmem_view() override { return vmem; }'
     yield ''
 
     yield 'std::vector<std::reference_wrapper<champsim::operable>> operable_view() override {'

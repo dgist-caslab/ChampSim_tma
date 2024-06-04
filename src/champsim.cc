@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "environment.h"
+#include "vmem.h"
 #include "ooo_cpu.h"
 #include "operable.h"
 #include "phase_info.h"
@@ -29,7 +30,9 @@
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 
-constexpr int DEADLOCK_CYCLE{500};
+#include <iostream>
+
+constexpr int DEADLOCK_CYCLE{10000};
 
 auto start_time = std::chrono::steady_clock::now();
 
@@ -61,6 +64,9 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
     }
 
     if (progress == 0) {
+      if constexpr (champsim::debug_print) {
+        std::cout << "sim_stall: " << std::dec << stalled_cycle << std::endl;
+      }
       ++stalled_cycle;
     } else {
       stalled_cycle = 0;
@@ -134,6 +140,10 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
                  [](const DRAM_CHANNEL& chan) { return chan.sim_stats; });
   std::transform(std::begin(slow_dram.channels), std::end(slow_dram.channels), std::back_inserter(stats.roi_slow_dram_stats),
                  [](const DRAM_CHANNEL& chan) { return chan.roi_stats; });
+
+  //[PHW] need to print allocated memory size
+  VirtualMemory& vmem = env.vmem_view();
+  std::cout << "Allocated memory size: 0x" << std::hex << vmem.get_last_ppage() << std::endl;
 
   return stats;
 }

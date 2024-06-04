@@ -3,7 +3,7 @@
     "block_size": 64,
     "page_size": 4096,
     "heartbeat_frequency": 10000000,
-    "num_cores": 1,
+    "num_cores": 2,
 
     "ooo_cpu": [
         {
@@ -83,7 +83,7 @@
         "prefetch_as_load": false,
         "virtual_prefetch": false,
         "prefetch_activate": "LOAD,PREFETCH",
-        "prefetcher": "l2c_stream"
+        "prefetcher": "next_line"
     },
 
     "ITLB": {

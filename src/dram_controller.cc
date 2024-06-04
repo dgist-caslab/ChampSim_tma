@@ -26,6 +26,9 @@
 #include "util/span.h"
 #include <fmt/core.h>
 
+#include <iostream>
+#include <algorithm>
+
 uint64_t cycles(double time, int io_freq)
 {
   std::fesetround(FE_UPWARD);
@@ -45,9 +48,9 @@ MEMORY_CONTROLLER::MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp
     DRAM_WRITE_LOW_WM = ((DRAM_SLOW_WQ_SIZE * 6) >> 3);
     MIN_DRAM_WRITES_PER_SWITCH = ((DRAM_SLOW_WQ_SIZE * 1) >> 2);
   }else{
-    DRAM_DBUS_RETURN_TIME = cycles(std::ceil(BLOCK_SIZE) / std::ceil(DRAM_SLOW_CHANNEL_WIDTH), 1);
+    DRAM_DBUS_RETURN_TIME = cycles(std::ceil(BLOCK_SIZE) / std::ceil(DRAM_CHANNEL_WIDTH), 1);
     DRAM_WRITE_HIGH_WM = ((DRAM_WQ_SIZE * 7) >> 3);
-    DRAM_WRITE_LOW_WM = ((DRAM_WQ_SIZE * 7) >> 3);
+    DRAM_WRITE_LOW_WM = ((DRAM_WQ_SIZE * 6) >> 3);
     MIN_DRAM_WRITES_PER_SWITCH = ((DRAM_WQ_SIZE * 1) >> 2);
   }
 }
@@ -87,8 +90,9 @@ long MEMORY_CONTROLLER::operate()
       response_type response{channel.active_request->pkt->value().address, channel.active_request->pkt->value().v_address,
                              channel.active_request->pkt->value().data, channel.active_request->pkt->value().pf_metadata,
                              channel.active_request->pkt->value().instr_depend_on_me};
-      for (auto ret : channel.active_request->pkt->value().to_return)
+      for (auto ret : channel.active_request->pkt->value().to_return){
         ret->push_back(response);
+      }
 
       channel.active_request->valid = false;
 
@@ -191,7 +195,6 @@ long MEMORY_CONTROLLER::operate()
 
         iter_next_schedule->value().scheduled = true;
         iter_next_schedule->value().event_cycle = std::numeric_limits<uint64_t>::max();
-
         ++progress;
       }
     }
@@ -210,10 +213,12 @@ void MEMORY_CONTROLLER::initialize()
     dram_size = DRAM_CHANNELS * DRAM_RANKS * DRAM_BANKS * DRAM_ROWS * DRAM_COLUMNS * BLOCK_SIZE / 1024 / 1024; // in MiB
     fmt::print("Off-chip DRAM Size: ");
   }
+
   if (dram_size > 1024)
     fmt::print("{} GiB", dram_size / 1024);
   else
     fmt::print("{} MiB", dram_size);
+
   if(isSlow){
     fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", DRAM_SLOW_CHANNELS, 8 * DRAM_SLOW_CHANNEL_WIDTH, DRAM_SLOW_IO_FREQ);
   }else{

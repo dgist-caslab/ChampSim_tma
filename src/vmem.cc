@@ -23,6 +23,8 @@
 #include "dram_controller.h"
 #include <fmt/core.h>
 
+#include <iostream>
+
 VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram, MEMORY_CONTROLLER& dram_slow)
     : next_ppage(VMEM_RESERVE_CAPACITY), last_ppage(1ull << (LOG2_PAGE_SIZE + champsim::lg2(page_table_page_size / PTE_BYTES) * page_table_levels)),
       minor_fault_penalty(minor_penalty), pt_levels(page_table_levels), pte_page_size(page_table_page_size)
@@ -35,7 +37,7 @@ VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_tab
   if (required_bits > 64)
     fmt::print("WARNING: virtual memory configuration would require {} bits of addressing.\n", required_bits); // LCOV_EXCL_LINE
   if (required_bits > champsim::lg2(dram.size() + dram_slow.size()))
-    fmt::print("WARNING: physical memory size is smaller than virtual memory size.\n"); // LCOV_EXCL_LINE
+    fmt::print("WARNING: physical memory size is smaller than virtual memory size. req:{}, F+S:{}\n", required_bits, champsim::lg2(dram.size() + dram_slow.size())); // LCOV_EXCL_LINE
 
 }
 
@@ -52,9 +54,23 @@ uint64_t VirtualMemory::ppage_front() const
   return next_ppage;
 }
 
-void VirtualMemory::ppage_pop() { next_ppage += PAGE_SIZE; }
+void VirtualMemory::ppage_pop() { 
+  static constexpr uint64_t HALF_GB_IN_PAGES = 536870912;
+  next_ppage += PAGE_SIZE;
+  if constexpr (champsim::debug_print) {
+    std::cout << " next_ppage: " << std::hex << next_ppage << std::endl;
+    if(next_ppage > DRAM_SIZE && flag_slow_alloc == false){
+      flag_slow_alloc = true;
+      fmt::print("[DEBUG] next_ppage: {:#x}, DRAM_SIZE: {:#x}\n", next_ppage, DRAM_SIZE);
+    }
+    if (next_ppage % HALF_GB_IN_PAGES == 0) {
+      fmt::print("[DEBUG] Allocated memory size: {} GB\n", (next_ppage) / (1ULL << 30));
+    }
+  }
+}
 
 std::size_t VirtualMemory::available_ppages() const { return (last_ppage - next_ppage) / PAGE_SIZE; }
+uint64_t VirtualMemory::get_last_ppage() { return next_ppage; }
 
 std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t vaddr)
 {

@@ -1,7 +1,10 @@
 #include "l2c_stream.h"
 
 l2c_stream::stream_buffer_t stream_buffer[l2c_stream::NUM_STREAM_BUFFER];
+l2c_stream::l2c_stream_stats_t l2c_stream_stats;
 int replacement_idx;
+double total_occu;
+
 
 void CACHE::prefetcher_initialize() {
     // init stream prefetcher
@@ -11,6 +14,14 @@ void CACHE::prefetcher_initialize() {
         stream_buffer[i].confidence = 0;
         stream_buffer[i].pf_idx = -1;
     }
+    // init l2c_stream_stats by using for statement
+    l2c_stream_stats.num_to_l2c = 0;
+    l2c_stream_stats.num_to_llc = 0;
+    l2c_stream_stats.num_pref = 0;
+    l2c_stream_stats.num_useful = 0;
+    l2c_stream_stats.avg_mshr_occupancy_ratio = 0;
+    total_occu = 0;
+
     replacement_idx = 0;
 }
 
@@ -70,16 +81,26 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
             break;
         }
         uint64_t pf_addr = (stream_buffer[buf_idx].page << LOG2_PAGE_SIZE) + (stream_buffer[buf_idx].pf_idx << LOG2_BLOCK_SIZE);
-        if(this->get_mshr_occupancy_ratio() < l2c_stream::PREF_THRESHOLD){
+        double mshr_occupancy_ratio = this->get_mshr_occupancy_ratio();
+        total_occu += mshr_occupancy_ratio;
+        if(mshr_occupancy_ratio < l2c_stream::PREF_THRESHOLD){
             // fill l2c
             prefetch_line(pf_addr, true, metadata_in);
+            l2c_stream_stats.num_to_l2c++;
         }else{
             // fill llc
             prefetch_line(pf_addr, false, metadata_in);
+            l2c_stream_stats.num_to_llc++;
         }
+        l2c_stream_stats.num_pref++;
 
     }
   }
+
+  if(useful_prefetch){
+    l2c_stream_stats.num_useful++;
+  }
+
   return metadata_in;
 }
 
@@ -91,4 +112,12 @@ uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way,
 
 void CACHE::prefetcher_cycle_operate() {}
 
-void CACHE::prefetcher_final_stats() {}
+void CACHE::prefetcher_final_stats() {
+    l2c_stream_stats.avg_mshr_occupancy_ratio = total_occu / l2c_stream_stats.num_pref;
+    std::cout << "L2C Stream Prefetcher Stats" << std::endl;
+    std::cout << "num_to_l2c:\t" << l2c_stream_stats.num_to_l2c << std::endl;
+    std::cout << "num_to_llc:\t" << l2c_stream_stats.num_to_llc << std::endl;
+    std::cout << "num_pref:\t" << l2c_stream_stats.num_pref << std::endl;
+    std::cout << "num_useful:\t" << l2c_stream_stats.num_useful << std::endl;
+    std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_stats.avg_mshr_occupancy_ratio << std::endl;
+}

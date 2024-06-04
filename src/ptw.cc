@@ -26,6 +26,8 @@
 #include "vmem.h"
 #include <fmt/core.h>
 
+#include <iostream>
+
 PageTableWalker::PageTableWalker(Builder b)
     : champsim::operable(b.m_freq_scale), upper_levels(b.m_uls), lower_level(b.m_ll), NAME(b.m_name), MSHR_SIZE(b.m_mshr_size), MAX_READ(b.m_max_tag_check),
       MAX_FILL(b.m_max_fill), HIT_LATENCY(b.m_latency), vmem(b.m_vmem), CR3_addr(b.m_vmem->get_pte_pa(b.m_cpu, 0, b.m_vmem->pt_levels).first)
@@ -113,6 +115,9 @@ long PageTableWalker::operate()
 {
   long progress{0};
 
+  // [PHW] finish returened packets
+  // packet which stil in translating, keep in MSHR(finished)
+  // packet which finished translating, keep in MSHR(completed)
   std::for_each(std::cbegin(lower_level->returned), std::cend(lower_level->returned), [this](const auto& pkt) { this->finish_packet(pkt); });
   progress += std::distance(std::cbegin(lower_level->returned), std::cend(lower_level->returned));
   lower_level->returned.clear();
@@ -120,11 +125,12 @@ long PageTableWalker::operate()
   std::vector<mshr_type> next_steps{};
 
   auto fill_bw = MAX_FILL;
+  // [PHW] sellect completed packet range in completed queue which has lower cycle than current cycle 
   auto [complete_begin, complete_end] = champsim::get_span_p(std::cbegin(completed), std::cend(completed), fill_bw,
                                                              [cycle = current_cycle](const auto& pkt) { return pkt.event_cycle <= cycle; });
   std::for_each(complete_begin, complete_end, [](auto& mshr_entry) {
     for (auto ret : mshr_entry.to_return)
-      ret->emplace_back(mshr_entry.v_address, mshr_entry.v_address, mshr_entry.data, mshr_entry.pf_metadata, mshr_entry.instr_depend_on_me);
+      ret->emplace_back(mshr_entry.v_address, mshr_entry.v_address, mshr_entry.data, mshr_entry.pf_metadata, mshr_entry.instr_depend_on_me); // [PHW] return v_address twice. why?
   });
   fill_bw -= std::distance(complete_begin, complete_end);
   progress += std::distance(complete_begin, complete_end);
@@ -155,6 +161,11 @@ long PageTableWalker::operate()
   }
 
   MSHR.insert(std::cend(MSHR), std::begin(next_steps), std::end(next_steps));
+  if constexpr(champsim::debug_print) {
+    if(progress == 0){
+      fmt::print("[{}] no progress\n", NAME);
+    }
+  }
   return progress;
 }
 
@@ -174,6 +185,12 @@ void PageTableWalker::finish_packet(const response_type& packet)
   auto finish_last_step = [this](auto& mshr_entry) {
     uint64_t penalty;
     std::tie(mshr_entry.data, penalty) = this->vmem->va_to_pa(mshr_entry.cpu, mshr_entry.v_address);
+    if constexpr (champsim::debug_print) {
+    // if(mshr_entry.address > 1073741824){
+      fmt::print("[{}] finish_last_step address: {:#x} v_address: {:#x} data: {:#x} translation_level: {}\n", NAME, mshr_entry.address, mshr_entry.v_address,
+                 mshr_entry.data, mshr_entry.translation_level);
+    }
+
     mshr_entry.event_cycle = this->current_cycle + (this->warmup ? 0 : penalty + HIT_LATENCY);
 
     if constexpr (champsim::debug_print) {

@@ -30,26 +30,74 @@
 #include <fmt/core.h>
 #include <fmt/ranges.h>
 
+#include <iostream>
+
 std::chrono::seconds elapsed_time();
 
 long O3_CPU::operate()
 {
   long progress{0};
+  long tmp_progress{0};
 
-  progress += retire_rob();                    // retire
-  progress += complete_inflight_instruction(); // finalize execution
-  progress += execute_instruction();           // execute instructions
-  progress += schedule_instruction();          // schedule instructions
-  progress += handle_memory_return();          // finalize memory transactions
-  progress += operate_lsq();                   // execute memory transactions
+  tmp_progress = retire_rob();                    // retire
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] retire_rob: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = complete_inflight_instruction(); // finalize execution
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] complete_inflight_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = execute_instruction();           // execute instructions
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] execute_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = schedule_instruction();          // schedule instructions
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] schedule_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = handle_memory_return();          // finalize memory transactions
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] handle_memory_return: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress += operate_lsq();                   // execute memory transactions
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] operate_lsq: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
 
-  progress += dispatch_instruction(); // dispatch
-  progress += decode_instruction();   // decode
-  progress += promote_to_decode();
+  tmp_progress = dispatch_instruction(); // dispatch
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] dispatch_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = decode_instruction();   // decode
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] decode_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = promote_to_decode();
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] promote_to_decode: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
 
-  progress += fetch_instruction(); // fetch
-  progress += check_dib();
+  tmp_progress = fetch_instruction(); // fetch
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] fetch_instruction: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
+  tmp_progress = check_dib();
+  if constexpr (champsim::debug_print) {
+    std::cout << "[ooo_CPU] check_dib: " << tmp_progress << std::endl;
+  }
+  progress += tmp_progress;
   initialize_instruction();
+
 
   // heartbeat
   if (show_heartbeat && (num_retired >= next_print_instruction)) {
@@ -67,6 +115,11 @@ long O3_CPU::operate()
     last_heartbeat_cycle = current_cycle;
   }
 
+  if constexpr (champsim::debug_print) {
+    if(progress == 0){
+      fmt::print("[CPU] no progress\n");
+    }
+  }
   return progress;
 }
 
@@ -433,7 +486,7 @@ void O3_CPU::do_memory_scheduling(ooo_model_instr& instr)
         ++instr.completed_mem_ops;
 
         if constexpr (champsim::debug_print)
-          fmt::print("[DISPATCH] {} instr_id: {} forwards_from: {}\n", __func__, instr.instr_id, sq_it->event_cycle);
+          fmt::print("[DISPATCH] {} instr_id: {} forwards_from: {} source_memory: {:#x}\n", __func__, instr.instr_id, sq_it->event_cycle, smem);
       } else {
         assert(sq_it->instr_id < instr.instr_id);   // The found SQ entry is a prior store
         sq_it->lq_depend_on_me.push_back(*q_entry); // Forward the load when the store finishes
@@ -446,8 +499,12 @@ void O3_CPU::do_memory_scheduling(ooo_model_instr& instr)
   }
 
   // store
-  for (auto& dmem : instr.destination_memory)
+  for (auto& dmem : instr.destination_memory){
+    if constexpr (champsim::debug_print) {
+      fmt::print("[DISPATCH] {} instr_id: {} dset_memory: {:#x}\n", __func__, instr.instr_id, dmem);
+    }
     SQ.emplace_back(instr.instr_id, dmem, instr.ip, instr.asid); // add it to the store queue
+  }
 
   if constexpr (champsim::debug_print) {
     fmt::print("[DISPATCH] {} instr_id: {} loads: {} stores: {}\n", __func__, instr.instr_id, std::size(instr.source_memory),

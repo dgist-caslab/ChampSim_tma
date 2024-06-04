@@ -113,7 +113,7 @@ def normalize_config(config_file):
     # The name 'DRAM' is reserved for the physical memory
     caches = {k:v for k,v in caches.items() if k != 'DRAM' or k !='DRAM_SLOW'}
 
-    return cores, caches, ptws, config_file.get('physical_memory', {}), config_file.get('physical_slow_memory', {}), config_file.get('virtual_memory', {})
+    return cores, caches, ptws, config_file.get('physical_fast_memory', {}), config_file.get('physical_slow_memory', {}), config_file.get('virtual_memory', {})
 
 def parse_normalized(cores, caches, ptws, pmem, spmem, vmem, merged_configs, branch_context, btb_context, prefetcher_context, replacement_context, compile_all_modules):
     config_file = util.chain(merged_configs, default_root)
