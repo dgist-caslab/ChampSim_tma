@@ -21,7 +21,7 @@ fi
 TRACE=$1
 NUM_CPU=$2
 for (( i=0; i<$NUM_CPU; i++ )); do
-        CONCATED_TRACE+="$TRACE "
+        CONCATED_TRACE+="$SPEC_TRACE_ROOT/$TRACE "
 done
 if [ -n "$3" ]; then
         NUM_WARMUP=$2

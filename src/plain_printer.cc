@@ -95,7 +95,7 @@ void champsim::plain_printer::print(champsim::phase_stats& stats)
 
   int i = 0;
   for (auto tn : stats.trace_names)
-    fmt::print(stream, "CPU {} runs {}", i++, tn);
+    fmt::print(stream, "CPU {} runs {}\n", i++, tn);
 
   if (NUM_CPUS > 1) {
     fmt::print(stream, "\nTotal Simulation Statistics (not including warmup)\n");

@@ -69,7 +69,7 @@ struct DRAM_CHANNEL {
   };
 
   // using request_array_type = std::array<BANK_REQUEST, DRAM_SLOW_RANKS * DRAM_BANKS>;
-  using request_array_type = std::array<BANK_REQUEST, 4 * 16>; //[PHW] TODO: make this for dynamic code
+  using request_array_type = std::array<BANK_REQUEST, 4 * 16>; //[PHW] TODO: make this for dynamic code, low prior
   request_array_type bank_request = {};
   request_array_type::iterator active_request = std::end(bank_request);
 
@@ -107,7 +107,7 @@ class MEMORY_CONTROLLER : public champsim::operable
   bool add_wq(const request_type& pkt);
 
 public:
-  std::array<DRAM_CHANNEL, DRAM_CHANNELS> channels;
+  std::array<DRAM_CHANNEL, DRAM_CHANNELS> channels; // should be modified if slow-memory's channel has multiple channel
 
   MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround, std::vector<channel_type*>&& ul, int is_slow);
 
