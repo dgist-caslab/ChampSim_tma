@@ -10,7 +10,7 @@
 namespace l2c_stream
 {
     constexpr std::size_t NUM_STREAM_BUFFER = 64;
-    constexpr std::size_t NUM_STREAM_BUFFER_FAST = 16;
+    constexpr std::size_t NUM_STREAM_BUFFER_FAST = 64;
     constexpr std::size_t NUM_STREAM_BUFFER_SLOW = NUM_STREAM_BUFFER - NUM_STREAM_BUFFER_FAST;
     constexpr std::size_t STREAM_BUFFER_SIZE = 8;
     constexpr std::size_t STREAM_WINDOW = 16;

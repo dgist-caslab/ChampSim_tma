@@ -49,7 +49,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
   uint32_t page_offset = (addr >> LOG2_BLOCK_SIZE) & (PAGE_SIZE / BLOCK_SIZE - 1);
   int buf_idx = -1;
 
-  if(page <= (DRAM_SIZE >> LOG2_PAGE_SIZE)){ // handle fast
+  if(page <= (DRAM_SIZE >> LOG2_PAGE_SIZE) && l2c_stream::NUM_STREAM_BUFFER_FAST > 0){ // handle fast
     for (std::size_t i = 0; i < l2c_stream::NUM_STREAM_BUFFER_FAST; i++) {
       if (stream_buffer_fast[i].page == page) {
         buf_idx = i;
@@ -120,7 +120,7 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
     }
 
     return metadata_in;
-  }else{ // handle slow
+  }else if(l2c_stream::NUM_STREAM_BUFFER_SLOW > 0){ // handle slow
     for (std::size_t i = 0; i < l2c_stream::NUM_STREAM_BUFFER_SLOW; i++) {
       if (stream_buffer_slow[i].page == page) {
         buf_idx = i;
@@ -205,17 +205,17 @@ void CACHE::prefetcher_cycle_operate() {}
 void CACHE::prefetcher_final_stats() {
     l2c_stream_fast_stats.avg_mshr_occupancy_ratio = total_occu_fast / l2c_stream_fast_stats.num_pref;
     l2c_stream_slow_stats.avg_mshr_occupancy_ratio = total_occu_slow / l2c_stream_slow_stats.num_pref;
-    std::cout << "L2C Stream Prefetcher Stats(FAST)" << std::endl;
+    std::cout << "L2C Stream Prefetcher TMA Stats(FAST)" << std::endl;
     std::cout << "num_to_l2c:\t" << l2c_stream_fast_stats.num_to_l2c << std::endl;
     std::cout << "num_to_llc:\t" << l2c_stream_fast_stats.num_to_llc << std::endl;
     std::cout << "num_pref:\t" << l2c_stream_fast_stats.num_pref << std::endl;
     std::cout << "num_useful:\t" << l2c_stream_fast_stats.num_useful << std::endl;
     std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_fast_stats.avg_mshr_occupancy_ratio << std::endl << std::endl;
-    std::cout << "L2C Stream Prefetcher Stats(SLOW)" << std::endl;
-    std::cout << "num_to_l2c:\t" << l2c_stream_fast_stats.num_to_l2c << std::endl;
-    std::cout << "num_to_llc:\t" << l2c_stream_fast_stats.num_to_llc << std::endl;
-    std::cout << "num_pref:\t" << l2c_stream_fast_stats.num_pref << std::endl;
-    std::cout << "num_useful:\t" << l2c_stream_fast_stats.num_useful << std::endl;
-    std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_fast_stats.avg_mshr_occupancy_ratio << std::endl;
+    std::cout << "L2C Stream Prefetcher TMA Stats(SLOW)" << std::endl;
+    std::cout << "num_to_l2c:\t" << l2c_stream_slow_stats.num_to_l2c << std::endl;
+    std::cout << "num_to_llc:\t" << l2c_stream_slow_stats.num_to_llc << std::endl;
+    std::cout << "num_pref:\t" << l2c_stream_slow_stats.num_pref << std::endl;
+    std::cout << "num_useful:\t" << l2c_stream_slow_stats.num_useful << std::endl;
+    std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_slow_stats.avg_mshr_occupancy_ratio << std::endl;
 
 }

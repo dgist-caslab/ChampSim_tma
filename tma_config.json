@@ -3,7 +3,7 @@
     "block_size": 64,
     "page_size": 4096,
     "heartbeat_frequency": 1000000,
-    "num_cores": 8,
+    "num_cores": 1,
 
     "ooo_cpu": [
         {
@@ -83,7 +83,7 @@
         "prefetch_as_load": false,
         "virtual_prefetch": false,
         "prefetch_activate": "LOAD,PREFETCH",
-        "prefetcher": "next_line"
+        "prefetcher": "l2c_stream_tma"
     },
 
     "ITLB": {
@@ -175,7 +175,7 @@
     },
 
     "physical_slow_memory": {
-        "frequency": 2133,
+        "frequency": 3200,
         "channels": 1,
         "ranks": 4,
         "banks": 16,
