@@ -7,8 +7,10 @@ BUILD_ID=$(grep -m 1 -oP '(?<=# Build ID: ).*' "$BUILD_CONFIG")
 CONSTANTS_FILE=$SIM_ROOT/.csconfig/$BUILD_ID/inc/champsim_constants.h
 SIM_NUM_CPU=$(grep -oP '(?<=constexpr std::size_t NUM_CPUS = )\d+' "$CONSTANTS_FILE")
 
-NUM_WARMUP=100000000    # 1B
-NUM_SIMUL=200000000     # 2B
+# NUM_WARMUP=100000000    # 1B
+# NUM_SIMUL=200000000     # 2B
+NUM_WARMUP=100000000    # 100M
+NUM_SIMUL=250000000     # 250M
 TRACE=""
 CONCATED_TRACE=""
 EXP_TIME=`date "+%y%m%d%H%M"`

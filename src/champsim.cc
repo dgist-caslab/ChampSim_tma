@@ -143,7 +143,8 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
 
   //[PHW] need to print allocated memory size
   VirtualMemory& vmem = env.vmem_view();
-  std::cout << "Allocated memory size: 0x" << std::hex << vmem.get_last_ppage() << std::endl;
+  std::cout << "Allocated fast memory size: 0x" << std::hex << vmem.get_last_ppage_fast() << std::endl;
+  std::cout << "Allocated slow memory size: 0x" << std::hex << vmem.get_last_ppage_slow() - DRAM_SIZE << std::endl;
 
   return stats;
 }

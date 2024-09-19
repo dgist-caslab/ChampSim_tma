@@ -115,9 +115,10 @@ void CACHE::prefetcher_cycle_operate() {}
 void CACHE::prefetcher_final_stats() {
     l2c_stream_stats.avg_mshr_occupancy_ratio = total_occu / l2c_stream_stats.num_pref;
     std::cout << "L2C Stream Prefetcher Stats" << std::endl;
-    std::cout << "num_to_l2c:\t" << l2c_stream_stats.num_to_l2c << std::endl;
-    std::cout << "num_to_llc:\t" << l2c_stream_stats.num_to_llc << std::endl;
-    std::cout << "num_pref:\t" << l2c_stream_stats.num_pref << std::endl;
-    std::cout << "num_useful:\t" << l2c_stream_stats.num_useful << std::endl;
+    std::cout << "num_to_l2c:\t" << std::dec << l2c_stream_stats.num_to_l2c << std::endl;
+    std::cout << "num_to_llc:\t" << std::dec << l2c_stream_stats.num_to_llc << std::endl;
+    std::cout << "num_pref:\t" << std::dec << l2c_stream_stats.num_pref << std::endl;
+    std::cout << "num_useful:\t" << std::dec << l2c_stream_stats.num_useful << std::endl;
+    std::cout << "hit_ratio:\t" << (double)l2c_stream_stats.num_useful / (double)l2c_stream_stats.num_pref << std::endl;
     std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_stats.avg_mshr_occupancy_ratio << std::endl;
 }

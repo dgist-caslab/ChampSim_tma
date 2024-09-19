@@ -3,8 +3,10 @@
 SIM_ROOT=/home/phw/workspace/simulator/ChampSim_tma
 SPEC_TRACE_ROOT=/home/phw/sim/traces/downloads
 LOG_ROOT=/home/phw/workspace/simulator/logs
-NUM_WARMUP=100000000    # 1B
-NUM_SIMUL=200000000     # 2B
+# NUM_WARMUP=100000000    # 1B
+# NUM_SIMUL=200000000     # 2B
+NUM_WARMUP=10000000    # 100M
+NUM_SIMUL=25000000     # 250M
 EXE_CLUSTER=32
 EXP_TIME=$(date "+%y%m%d%H%M")
 

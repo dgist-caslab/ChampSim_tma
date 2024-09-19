@@ -2,7 +2,7 @@
     "executable_name": "champsim",
     "block_size": 64,
     "page_size": 4096,
-    "heartbeat_frequency": 1000000,
+    "heartbeat_frequency": 10000000,
     "num_cores": 1,
 
     "ooo_cpu": [
@@ -56,7 +56,7 @@
 
     "L1D": {
         "sets": 64,
-        "ways": 12,
+        "ways": 8,
         "rq_size": 64,
         "wq_size": 64,
         "pq_size": 8,
@@ -72,7 +72,7 @@
 
     "L2C": {
         "sets": 1024,
-        "ways": 8,
+        "ways": 16,
         "rq_size": 32,
         "wq_size": 32,
         "pq_size": 16,
@@ -83,7 +83,7 @@
         "prefetch_as_load": false,
         "virtual_prefetch": false,
         "prefetch_activate": "LOAD,PREFETCH",
-        "prefetcher": "l2c_stream_tma"
+        "prefetcher": "l2c_stream_dyn"
     },
 
     "ITLB": {
@@ -142,8 +142,8 @@
 
     "LLC": {
         "frequency": 4000,
-        "sets": 2048,
-        "ways": 16,
+        "sets": 16384,
+        "ways": 11,
         "rq_size": 32,
         "wq_size": 32,
         "pq_size": 32,

@@ -124,10 +124,22 @@ long MEMORY_CONTROLLER::operate()
       }
 
       // Add data bus turn-around time
-      if (channel.active_request != std::end(channel.bank_request))
-        channel.dbus_cycle_available = channel.active_request->event_cycle + DRAM_DBUS_TURN_AROUND_TIME; // After ongoing finish
-      else
-        channel.dbus_cycle_available = current_cycle + DRAM_DBUS_TURN_AROUND_TIME;
+      if (channel.active_request != std::end(channel.bank_request)){
+
+        if(isSlow){
+          channel.dbus_cycle_available = channel.active_request->event_cycle + DRAM_DBUS_TURN_AROUND_TIME + 320; // After ongoing finish
+          // channel.dbus_cycle_available = channel.active_request->event_cycle + DRAM_DBUS_TURN_AROUND_TIME; // After ongoing finish
+        }else{
+          channel.dbus_cycle_available = channel.active_request->event_cycle + DRAM_DBUS_TURN_AROUND_TIME; // After ongoing finish
+        }
+      }else{
+        if(isSlow){
+          channel.dbus_cycle_available = current_cycle + DRAM_DBUS_TURN_AROUND_TIME + 320;
+          // channel.dbus_cycle_available = current_cycle + DRAM_DBUS_TURN_AROUND_TIME;
+        }else{
+          channel.dbus_cycle_available = current_cycle + DRAM_DBUS_TURN_AROUND_TIME;
+        }
+      }
 
       // Invert the mode
       channel.write_mode = !channel.write_mode;
