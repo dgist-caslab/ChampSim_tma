@@ -83,7 +83,7 @@
         "prefetch_as_load": false,
         "virtual_prefetch": false,
         "prefetch_activate": "LOAD,PREFETCH",
-        "prefetcher": "l2c_stream_dyn"
+        "prefetcher": "cap"
     },
 
     "ITLB": {
