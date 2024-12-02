@@ -102,8 +102,8 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
         for (champsim::operable& op : operables)
           op.end_phase(cpu.cpu);
 
-        fmt::print("{} finished CPU {} instructions: {} cycles: {} cumulative IPC: {:.4g} (Simulation time: {:%H hr %M min %S sec})\n", phase_name, cpu.cpu,
-                   cpu.sim_instr(), cpu.sim_cycle(), std::ceil(cpu.sim_instr()) / std::ceil(cpu.sim_cycle()), elapsed_time());
+        fmt::print("{} finished CPU {} instructions: {} cycles: {} stall_cycles: {} cumulative IPC: {:.4g} (Simulation time: {:%H hr %M min %S sec})\n", phase_name, cpu.cpu,
+                   cpu.sim_instr(), cpu.sim_cycle(), cpu.rob_stall_cycle(), std::ceil(cpu.sim_instr()) / std::ceil(cpu.sim_cycle()), elapsed_time());
       }
     }
 

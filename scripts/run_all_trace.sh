@@ -6,8 +6,8 @@ SPEC_TRACE_ROOT=/home/phw/workspace/traces/Champsim/spec/
 LOG_ROOT=/home/phw/workspace/simulator/logs/last_exp
 # NUM_WARMUP=100000000    # 1B
 # NUM_SIMUL=200000000     # 2B
-NUM_WARMUP=10000000    # 100M
-NUM_SIMUL=25000000     # 250M
+NUM_WARMUP=100000000    # 100M
+NUM_SIMUL=250000000     # 250M
 EXE_CLUSTER=24
 EXP_TIME=$(date "+%y%m%d%H%M")
 
@@ -27,8 +27,9 @@ export SIM_ROOT NUM_WARMUP NUM_SIMUL SPEC_TRACE_ROOT LOG_ROOT EXP_TIME
 # for setup in berti;
 # for setup in bingo berti;
 # for setup in cap;
+for setup in dyn;
 # for setup in bingo;
-for setup in berti;
+# for setup in berti;
 # for setup in no dyn bingo berti cap;
 do
     mkdir $LOG_ROOT/../tma_$setup

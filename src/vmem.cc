@@ -35,6 +35,11 @@ VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_tab
 
   auto required_bits = champsim::lg2(last_ppage);
 
+  // for (size_t i = 0; i < NUM_CPUS; i++)
+  // {
+  //   tma_idx[i] = 0;
+  // }
+
   next_ppage_slow = DRAM_SIZE;
   
   if (required_bits > 64)
@@ -95,20 +100,24 @@ uint64_t VirtualMemory::get_last_ppage_slow() { return next_ppage_slow; }
 
 std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t vaddr)
 {
-  bool is_slow = true;
-  if(tma_idx % tma_thd == 0){
-    is_slow = false;
-  }
+  bool is_slow = false;
+  // if(tma_idx[cpu_num] % tma_thd == 0){
+  //   is_slow = false;
+  // }
+
   auto [ppage, fault] = vpage_to_ppage_map.insert({{cpu_num, vaddr >> LOG2_PAGE_SIZE}, ppage_front(is_slow)});
 
+  /* [PHW]TODO 241129
+  find prefetch_hit_rate and hit_bitmap from [loaded csv]
+  */
   // this vpage doesn't yet have a ppage mapping
   // so alloc new pa to va
   if (fault){
     ppage_pop(ppage->second);
-    if(tma_idx % tma_thd == 0){
-      tma_idx = 0;
-    }
-    tma_idx++;
+    // if(tma_idx[cpu_num] % tma_thd == 0){
+    //   tma_idx[cpu_num] = 0;
+    // }
+    // tma_idx[cpu_num]++;
   }
   // fmt::print("[VMEM] {} paddr: {:x} vaddr: {:x} fault: {} tma_idx: {}\n", __func__, ppage->second, vaddr, fault, tma_idx);
 

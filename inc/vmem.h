@@ -38,8 +38,9 @@ private:
 
   uint64_t next_pte_page = 0;
 
-  int tma_idx = 0; // [PHW]init 1 for count like 1, 2, 3, 0. 0 is alloc trigger for fast memory
-  int tma_thd = 4; // [PHW]adjust the ratio of fast memory allocation
+  // int tma_idx = 0; // [PHW]init 1 for count like 1, 2, 3, 0. 0 is alloc trigger for fast memory
+  // int tma_idx[NUM_CPUS]; // [PHW]init 1 for count like 1, 2, 3, 0. 0 is alloc trigger for fast memory
+  // int tma_thd = 4; // [PHW]adjust the ratio of fast memory allocation
   uint64_t next_ppage_fast;
   uint64_t next_ppage_slow;
   uint64_t last_ppage;

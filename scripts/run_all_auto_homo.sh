@@ -17,7 +17,7 @@ run_simulator() {
     echo $trace_file
     echo $trace_name
     echo $SIM_ROOT/bin/champsim_$2 --warmup-instructions $NUM_WARMUP --simulation-instructions $NUM_SIMUL $trace_file > $LOG_ROOT/${trace_name}_${EXP_TIME}.log 2>&1
-    $SIM_ROOT/bin/champsim_$2 --warmup-instructions $NUM_WARMUP --simulation-instructions $NUM_SIMUL $trace_file > $LOG_ROOT/${trace_name}_${EXP_TIME}.log 2>&1
+    $SIM_ROOT/bin/champsim_$2 --warmup-instructions $NUM_WARMUP --simulation-instructions $NUM_SIMUL $trace_file $trace_file $trace_file $trace_file > $LOG_ROOT/${trace_name}_${EXP_TIME}.log 2>&1
 }
 
 export -f run_simulator
@@ -28,8 +28,8 @@ export SIM_ROOT NUM_WARMUP NUM_SIMUL SPEC_TRACE_ROOT LOG_ROOT EXP_TIME
 # for setup in bingo berti;
 # for setup in cap;
 # for setup in bingo;
-for setup in berti;
-# for setup in no dyn bingo berti cap;
+# for setup in berti;
+for setup in no dyn bingo;
 do
     mkdir $LOG_ROOT/../tma_$setup
     find $SPEC_TRACE_ROOT -type f -name '*.champsimtrace.xz' | parallel -j $EXE_CLUSTER run_simulator {} $setup

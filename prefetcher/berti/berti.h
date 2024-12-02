@@ -13,12 +13,29 @@
 #include <cstdint>
 #include <iostream>
 
+namespace{
+    uint64_t num_prefetch_cxl = 0;
+    uint64_t num_prefetch_ddr = 0;
+    uint64_t num_prefetch_hit_cxl = 0;
+    uint64_t num_prefetch_hit_ddr = 0;
+
+    bool is_cxl_memory(uint64_t addr){
+    if( addr > DRAM_SIZE){
+        return true;
+    }else{
+        return false;
+    }
+    }
+
+}
+
+
 namespace BERTI
 {
 uint32_t l2c_cpu_id;
-#define L2C_PAGE_BLOCKS_BITS (LOG2_PAGE_SIZE - LOG2_BLOCK_SIZE)
-#define L2C_PAGE_BLOCKS (1 << L2C_PAGE_BLOCKS_BITS)
-#define L2C_PAGE_OFFSET_MASK (L2C_PAGE_BLOCKS - 1)
+#define L2C_PAGE_BLOCKS_BITS (LOG2_PAGE_SIZE - LOG2_BLOCK_SIZE) // 12 - 6 = 6
+#define L2C_PAGE_BLOCKS (1 << L2C_PAGE_BLOCKS_BITS) // 64
+#define L2C_PAGE_OFFSET_MASK (L2C_PAGE_BLOCKS - 1) // 63
 
 #define L2C_MAX_NUM_BURST_PREFETCHES 3
 
@@ -108,6 +125,7 @@ uint64_t l2c_ip_table[NUM_CPUS][L2C_IP_TABLE_ENTRIES]; // 10 bits
 
 // TIME AND OVERFLOWS
 uint64_t l2c_get_latency(uint64_t cycle, uint64_t cycle_prev) {
+    // std::cout << "[PHW]debug 4 cycle: " << cycle << " cycle_prev: " << cycle_prev << std::endl;
     return cycle - cycle_prev;
     uint64_t cycle_masked = cycle & L2C_TIME_MASK;
     uint64_t cycle_prev_masked = cycle_prev & L2C_TIME_MASK;
@@ -182,6 +200,7 @@ int l2c_get_berti_current_pages_table(uint64_t index, uint64_t &ctr) {
       ctr = l2c_current_pages_table[l2c_cpu_id][index].berti_ctr[i];
     }
   }
+  // std::cout << "[debug 03-02] berti: " << std::dec << berti << " ctr: " << ctr << std::endl;
   return berti;
 }
 
@@ -195,6 +214,7 @@ void l2c_add_current_pages_table(uint64_t index, uint64_t page_addr, uint64_t ip
     l2c_current_pages_table[l2c_cpu_id][index].berti_ctr[i] = 0;
   }
   l2c_current_pages_table[l2c_cpu_id][index].last_burst = 0;
+  // std::cout << "[debug 02-03] l2c_current_pages_table[0]][" << std::dec << index << "].page_addr: 0x" << std::hex << page_addr << "\tip: 0x" << ip << "\toffset: 0x" << offset << std::endl;
 }
 
 uint64_t l2c_update_demand_current_pages_table(uint64_t index, uint64_t offset) {
@@ -211,6 +231,8 @@ void l2c_add_berti_current_pages_table(uint64_t index, int berti) {
     if (l2c_current_pages_table[l2c_cpu_id][index].berti_ctr[i] == 0) {
       l2c_current_pages_table[l2c_cpu_id][index].berti[i] = berti;
       l2c_current_pages_table[l2c_cpu_id][index].berti_ctr[i] = 1;
+      // std::cout << "[debug 01-06] l2c_current_pages_table[0][" << std::dec << index << "].berti[" << i << "]: " << std::dec << berti << std::endl;
+      // std::cout << "[debug 01-07] l2c_current_pages_table[0][" << std::dec << index << "].berti_ctr[" << i << "]: " << std::dec << 1 << std::endl;
       break;
     } else if (l2c_current_pages_table[l2c_cpu_id][index].berti[i] == berti) {
       l2c_current_pages_table[l2c_cpu_id][index].berti_ctr[i]++;
@@ -249,13 +271,18 @@ uint64_t l2c_find_prev_request_entry(uint64_t pointer, uint64_t offset) {
 
 void l2c_add_prev_requests_table(uint64_t pointer, uint64_t offset, uint64_t cycle) {
   // First find for coalescing
-  if (l2c_find_prev_request_entry(pointer, offset) != L2C_PREV_REQUESTS_TABLE_ENTRIES) return;
+  if (l2c_find_prev_request_entry(pointer, offset) != L2C_PREV_REQUESTS_TABLE_ENTRIES){
+    // std::cout << "[debug 02-08] found" << std::endl;
+    return;
+  }
 
   // Allocate a new entry (evict old one if necessary)
   l2c_prev_requests_table[l2c_cpu_id][l2c_prev_requests_table_head[l2c_cpu_id]].page_addr_pointer = pointer;
   l2c_prev_requests_table[l2c_cpu_id][l2c_prev_requests_table_head[l2c_cpu_id]].offset = offset;
-  l2c_prev_requests_table[l2c_cpu_id][l2c_prev_requests_table_head[l2c_cpu_id]].time = cycle & L2C_TIME_MASK;
+  // l2c_prev_requests_table[l2c_cpu_id][l2c_prev_requests_table_head[l2c_cpu_id]].time = cycle & L2C_TIME_MASK;
+  l2c_prev_requests_table[l2c_cpu_id][l2c_prev_requests_table_head[l2c_cpu_id]].time = cycle; // [PHW]
   l2c_prev_requests_table_head[l2c_cpu_id] = (l2c_prev_requests_table_head[l2c_cpu_id] + 1) & L2C_PREV_REQUESTS_TABLE_MASK;
+  // std::cout << "[debug 02-09] prev_req_table head_idx: " << std::dec << l2c_prev_requests_table_head[0] << " addr: 0x" << std::hex << pointer << "\toffset: 0x" << offset << "\tcycle: " << std::dec << cycle << std::endl;
 }
 
 void l2c_reset_pointer_prev_requests(uint64_t pointer) {
@@ -276,20 +303,31 @@ void l2c_get_berti_prev_requests_table(uint64_t pointer, uint64_t offset, uint64
   int my_pos = 0;
   uint64_t extra_time = 0;
   uint64_t last_time = l2c_prev_requests_table[l2c_cpu_id][(l2c_prev_requests_table_head[l2c_cpu_id] + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK].time;
+  // std::cout << "[PHW]debug 4 last_time: " << last_time << std::endl;
+  // std::cout << "[PHW]debug 4.0 l2c_prev_requests_table_head[0]: " << l2c_prev_requests_table_head[0] << " L2C_PREV_REQUEST_TABLE_MASK: " << L2C_PREV_REQUESTS_TABLE_MASK << std::endl;
+  // std::cout << "[PHW]debug 4.01 first: " << ((l2c_prev_requests_table_head[l2c_cpu_id] + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK) << std::endl; 
+  // std::cout << "[PHW]debug 4.02 second: " << l2c_prev_requests_table_head[l2c_cpu_id] << std::endl;
+  // std::cout << "[PHW]debug 4.03 thrid: " << ((((l2c_prev_requests_table_head[l2c_cpu_id] + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK) + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK) << std::endl;
   for (uint64_t i = (l2c_prev_requests_table_head[l2c_cpu_id] + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK; i != l2c_prev_requests_table_head[l2c_cpu_id]; i = (i + L2C_PREV_REQUESTS_TABLE_MASK) & L2C_PREV_REQUESTS_TABLE_MASK) {
     // Against the time overflow
+    // std::cout << "[PHW]debug 4.04 last_time: " << last_time << " table.time: " << l2c_prev_requests_table[l2c_cpu_id][i].time << std::endl;
     if (last_time < l2c_prev_requests_table[l2c_cpu_id][i].time) {
       extra_time = L2C_TIME_OVERFLOW;
     }
     last_time = l2c_prev_requests_table[l2c_cpu_id][i].time;  
+    // std::cout << "[PHW]debug 4.05 extra_time: " << extra_time << " last_time: " << last_time << std::endl;
+    // std::cout << "[PHW] debug 4.06 l2c_prev_req_table.pointer: " <<  l2c_prev_requests_table[l2c_cpu_id][i].page_addr_pointer << " pointer: " << pointer << std::endl;
     if (l2c_prev_requests_table[l2c_cpu_id][i].page_addr_pointer == pointer) {
-      if (l2c_prev_requests_table[l2c_cpu_id][i].time <= (cycle & L2C_TIME_MASK) + extra_time) {
-	berti[my_pos] = l2c_calculate_stride(l2c_prev_requests_table[l2c_cpu_id][i].offset, offset);
-	my_pos++;
-	if (my_pos == L2C_CURRENT_PAGES_TABLE_NUM_BERTI_PER_ACCESS) return;
+      // std::cout << "[PHW]debug 4.10 table.time: " << l2c_prev_requests_table[l2c_cpu_id][i].time << " second: " << ((cycle) + extra_time) << " extra: " << extra_time << std::endl;
+      // if (l2c_prev_requests_table[l2c_cpu_id][i].time <= (cycle & L2C_TIME_MASK) + extra_time) { // [PHW] target!
+      if (l2c_prev_requests_table[l2c_cpu_id][i].time <= (cycle) + extra_time) { // [PHW]
+        berti[my_pos] = l2c_calculate_stride(l2c_prev_requests_table[l2c_cpu_id][i].offset, offset); //[PHW]
+        my_pos++;
+        if (my_pos == L2C_CURRENT_PAGES_TABLE_NUM_BERTI_PER_ACCESS) return;
       }
     }
   }
+  // std::cout << "[PHW]debug 4.2 my_pos: " << my_pos << std::endl;
   berti[my_pos] = 0;
 }
 
@@ -303,21 +341,31 @@ void l2c_init_prev_prefetches_table() {
 
 uint64_t l2c_find_prev_prefetch_entry(uint64_t pointer, uint64_t offset) {
   for (int i = 0; i < L2C_PREV_PREFETCHES_TABLE_ENTRIES; i++) {
-    if (l2c_prev_prefetches_table[l2c_cpu_id][i].page_addr_pointer == pointer
-	&& l2c_prev_prefetches_table[l2c_cpu_id][i].offset == offset) return i;
+    if (l2c_prev_prefetches_table[l2c_cpu_id][i].page_addr_pointer == pointer && l2c_prev_prefetches_table[l2c_cpu_id][i].offset == offset) {
+      return i;
+    }else{
+      // std::cout << "search_pref_table[" << i << "]: " << std::dec << l2c_prev_prefetches_table[l2c_cpu_id][i].page_addr_pointer << " offset: 0x" << std::hex << l2c_prev_prefetches_table[l2c_cpu_id][i].offset << std::endl;
+    }
   }
   return L2C_PREV_PREFETCHES_TABLE_ENTRIES;
 }
 
 void l2c_add_prev_prefetches_table(uint64_t pointer, uint64_t offset, uint64_t cycle) {
   // First find for coalescing
-  if (l2c_find_prev_prefetch_entry(pointer, offset) != L2C_PREV_PREFETCHES_TABLE_ENTRIES) return;
+  uint64_t ret = l2c_find_prev_prefetch_entry(pointer, offset);
+  if (ret != L2C_PREV_PREFETCHES_TABLE_ENTRIES){
+    // std::cout << "[debug 06-01] found in table" << std::endl;
+    return;
+  }
+
 
   // Allocate a new entry (evict old one if necessary)
   l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].page_addr_pointer = pointer;
   l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].offset = offset;
-  l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].time_lat = cycle & L2C_TIME_MASK;
+  // l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].time_lat = cycle & L2C_TIME_MASK;
+  l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].time_lat = cycle; // [PHW]
   l2c_prev_prefetches_table[l2c_cpu_id][l2c_prev_prefetches_table_head[l2c_cpu_id]].completed = false;
+  // std::cout << "[debug 06-02] prev_prefetch_table head_idx: " << std::dec << l2c_prev_prefetches_table_head[l2c_cpu_id] << " addr_pointer: " << std::dec << pointer << " offset: 0x" << std::hex << offset << " cycle: " << std::dec << cycle << std::endl;
   l2c_prev_prefetches_table_head[l2c_cpu_id] = (l2c_prev_prefetches_table_head[l2c_cpu_id] + 1) & L2C_PREV_PREFETCHES_TABLE_MASK;
 }
 
@@ -338,7 +386,9 @@ void l2c_reset_entry_prev_prefetches_table(uint64_t pointer, uint64_t offset) {
 
 uint64_t l2c_get_and_set_latency_prev_prefetches_table(uint64_t pointer, uint64_t offset, uint64_t cycle) {
   uint64_t index = l2c_find_prev_prefetch_entry(pointer, offset); 
-  if (index == L2C_PREV_PREFETCHES_TABLE_ENTRIES) return 0;
+  if (index == L2C_PREV_PREFETCHES_TABLE_ENTRIES){
+    return 0;
+  }
   if (!l2c_prev_prefetches_table[l2c_cpu_id][index].completed) {
     l2c_prev_prefetches_table[l2c_cpu_id][index].time_lat = l2c_get_latency(cycle, l2c_prev_prefetches_table[l2c_cpu_id][index].time_lat);
     l2c_prev_prefetches_table[l2c_cpu_id][index].completed = true;
@@ -346,10 +396,19 @@ uint64_t l2c_get_and_set_latency_prev_prefetches_table(uint64_t pointer, uint64_
   return l2c_prev_prefetches_table[l2c_cpu_id][index].time_lat;
 }
 
-uint64_t l2c_get_latency_prev_prefetches_table(uint64_t pointer, uint64_t offset) {
+uint64_t l2c_get_latency_prev_prefetches_table(uint64_t pointer, uint64_t offset)
+{
   uint64_t index = l2c_find_prev_prefetch_entry(pointer, offset);
-  if (index == L2C_PREV_PREFETCHES_TABLE_ENTRIES) return 0;
-  if (!l2c_prev_prefetches_table[l2c_cpu_id][index].completed) return 0;
+  // std::cout << "[debug 01-01] pointer: " << pointer << " offset: 0x" << std::hex << offset << " index: " << std::dec << index << std::endl;
+  if (index == L2C_PREV_PREFETCHES_TABLE_ENTRIES) {
+    // std::cout << "[debug 01-02] pointer: " << pointer << " offset: 0x" << std::hex << offset << " index: " << std::dec << index << std::endl;
+    return 0;
+  }
+  if (!l2c_prev_prefetches_table[l2c_cpu_id][index].completed) {
+    // std::cout << "[debug 01-03] pointer: " << pointer << " offset: 0x" << std::hex << offset << " index: " << std::dec << index << std::endl;
+    return 0;
+  }
+  // std::cout << "[debug 01-04] pointer: " << pointer << " offset: 0x" << std::hex << offset << " index: " << std::dec << index << std::endl;
   return l2c_prev_prefetches_table[l2c_cpu_id][index].time_lat;
 }
 

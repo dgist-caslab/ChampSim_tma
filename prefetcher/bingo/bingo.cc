@@ -33,6 +33,13 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
         warmup_flag_l2 = 1;
 
     }
+    if(useful_prefetch && cache_hit){
+        if(is_cxl_memory(addr)){
+            num_prefetch_hit_cxl++;
+        }else{
+            num_prefetch_hit_ddr++;
+        }
+    }
 
     if (BINGO::DEBUG_LEVEL >= 2) {
         cerr << "CACHE::BINGOetcher_operate(addr=0x" << hex << addr << ", ip=0x" << ip << ", cache_hit=" << dec
@@ -82,4 +89,8 @@ uint32_t CACHE::prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t matc
 }
 void CACHE::prefetcher_final_stats() {
 	 BINGO::prefetchers[cpu].print_stats();
+     std::cout << "num_prefetch_ddr: " << std::dec << num_prefetch_ddr << std::endl;
+     std::cout << "num_prefetch_hit_ddr: " << std::dec << num_prefetch_hit_ddr << std::endl;
+     std::cout << "num_prefetch_cxl: " << std::dec << num_prefetch_cxl << std::endl;
+     std::cout << "num_prefetch_hit_cxl: " << std::dec << num_prefetch_hit_cxl << std::endl;
 }

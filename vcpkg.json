@@ -5,8 +5,6 @@
     "cli11",
     "nlohmann-json",
     "fmt",
-    "bzip2",
-    "zlib",
-    "catch2"
+    "zlib"
   ]
 }

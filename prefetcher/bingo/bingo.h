@@ -5,16 +5,34 @@
 #include "cache.h"
 #include <channel.h>
 #include <bits/stdc++.h>
+#include "champsim_constants.h"
 #include <vector>
 #include <cassert>
 
 using namespace std;
 
 uint8_t warmup_flag_l2 = 0;
+namespace{
+    uint64_t num_prefetch_cxl = 0;
+    uint64_t num_prefetch_ddr = 0;
+    uint64_t num_prefetch_hit_cxl = 0;
+    uint64_t num_prefetch_hit_ddr = 0;
+
+    bool is_cxl_memory(uint64_t addr){
+    if( addr > DRAM_SIZE){
+        return true;
+    }else{
+        return false;
+    }
+    }
+
+}
 namespace BINGO{
 
 #define SIZE_OF_PHT 16 * 1024
 #define WAYS_IN_PHT 16
+
+
 
 class Table {
   public:
@@ -749,6 +767,11 @@ class PrefetchStreamer : public LRUSetAssociativeCache<PrefetchStreamerData> {
                     // int ok = cache->prefetch_line(0, base_addr, pf_address, pattern[pf_offset], 0);
                     // int ok = cache->prefetch_line(pf_address, true, 0);
                     cache->prefetch_line(pf_address, true, 0);
+                    if(is_cxl_memory(pf_address)){
+                        num_prefetch_cxl++;
+                    }else{
+                        num_prefetch_ddr++;
+                    }
                     // assert(ok == 1);
                     pf_issued += 1;
                     pattern[pf_offset] = 0;

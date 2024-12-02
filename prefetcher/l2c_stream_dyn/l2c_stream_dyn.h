@@ -6,6 +6,21 @@
 #include <cstdint>
 #include <iostream>
 
+namespace{
+    uint64_t num_prefetch_cxl = 0;
+    uint64_t num_prefetch_ddr = 0;
+    uint64_t num_prefetch_hit_cxl = 0;
+    uint64_t num_prefetch_hit_ddr = 0;
+
+    bool is_cxl_memory(uint64_t addr){
+    if( addr > DRAM_SIZE){
+        return true;
+    }else{
+        return false;
+    }
+    }
+}
+
 namespace l2c_stream_dyn
 {
     constexpr std::size_t NUM_STREAM_BUFFER = 64;

@@ -32,6 +32,14 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
   uint32_t page_offset = (addr >> LOG2_BLOCK_SIZE) & (PAGE_SIZE / BLOCK_SIZE - 1);
   int buf_idx = -1;
 
+  if(cache_hit && useful_prefetch){
+    if(is_cxl_memory(addr)){
+      num_prefetch_hit_cxl++;
+    }else{
+      num_prefetch_hit_ddr++;
+    }
+  }
+
   for (std::size_t i = 0; i < l2c_stream_dyn::NUM_STREAM_BUFFER; i++) {
     if (stream_buffer_dyn[i].page == page) {
       buf_idx = i;
@@ -88,10 +96,20 @@ uint32_t CACHE::prefetcher_cache_operate(uint64_t addr, uint64_t ip, uint8_t cac
         if(mshr_occupancy_ratio < l2c_stream_dyn::PREF_THRESHOLD){
             // fill l2c
             prefetch_line(pf_addr, true, metadata_in);
+            if(is_cxl_memory(pf_addr)){
+              num_prefetch_cxl++;
+            }else{
+              num_prefetch_ddr++;
+            }
             l2c_stream_dyn_stats.num_to_l2c++;
         }else{
             // fill llc
             prefetch_line(pf_addr, false, metadata_in);
+            if(is_cxl_memory(pf_addr)){
+              num_prefetch_cxl++;
+            }else{
+              num_prefetch_ddr++;
+            }
             l2c_stream_dyn_stats.num_to_llc++;
         }
         l2c_stream_dyn_stats.num_pref++;
@@ -130,4 +148,9 @@ void CACHE::prefetcher_final_stats() {
     std::cout << "num_useful:\t" << std::dec << l2c_stream_dyn_stats.num_useful << std::endl;
     std::cout << "hit_ratio:\t" << (double)l2c_stream_dyn_stats.num_useful / (double)l2c_stream_dyn_stats.num_pref << std::endl;
     std::cout << "avg_mshr_occupancy_ratio:\t" << l2c_stream_dyn_stats.avg_mshr_occupancy_ratio << std::endl;
+
+    std::cout << "num_prefetch_ddr: " << std::dec << num_prefetch_ddr << std::endl;
+    std::cout << "num_prefetch_hit_ddr: " << std::dec << num_prefetch_hit_ddr << std::endl;
+    std::cout << "num_prefetch_cxl: " << std::dec << num_prefetch_cxl << std::endl;
+    std::cout << "num_prefetch_hit_cxl: " << std::dec << num_prefetch_hit_cxl << std::endl;
 }

@@ -65,6 +65,7 @@ struct cpu_stats {
   std::string name;
   uint64_t begin_instrs = 0, begin_cycles = 0;
   uint64_t end_instrs = 0, end_cycles = 0;
+  uint64_t rob_stall_cycles = 0; //[PHW]
   uint64_t total_rob_occupancy_at_branch_mispredict = 0;
 
   std::array<long long, 8> total_branch_types = {};
@@ -187,6 +188,7 @@ public:
   uint64_t roi_cycle() const { return roi_stats.cycles(); }
   uint64_t sim_instr() const { return num_retired - begin_phase_instr; }
   uint64_t sim_cycle() const { return current_cycle - sim_stats.begin_cycles; }
+  uint64_t rob_stall_cycle() const { return sim_stats.rob_stall_cycles; }
 
   void print_deadlock() override final;
 

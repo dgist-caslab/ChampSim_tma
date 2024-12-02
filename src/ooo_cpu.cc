@@ -683,6 +683,9 @@ long O3_CPU::retire_rob()
     std::for_each(retire_begin, retire_end, [](const auto& x) { fmt::print("[ROB] retire_rob instr_id: {} is retired\n", x.instr_id); });
   }
   auto retire_count = std::distance(retire_begin, retire_end);
+  if(retire_count == 0){
+    sim_stats.rob_stall_cycles++;
+  }
   num_retired += retire_count;
   ROB.erase(retire_begin, retire_end);
 
