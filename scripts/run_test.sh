@@ -9,8 +9,8 @@ TRACE_FILE=/home/phw/workspace/traces/Champsim/spec/602.gcc_s-2375B.champsimtrac
 # LOG_FILE=/home/phw/workspace/simulator/logs/last_exp/sim_test.log
 
 # Define the warmup and simulation instructions
-NUM_WARMUP=100000000    # 100M instructions for warmup
-NUM_SIMUL=250000000     # 250M instructions for simulation
+NUM_WARMUP=10000000    # 10M instructions for warmup
+NUM_SIMUL=25000000     # 25M instructions for simulation
 # NUM_SIMUL=500000000     # 500M instructions for simulation
 
 # Run the simulator with a sample trace

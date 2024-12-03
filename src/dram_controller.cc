@@ -36,23 +36,19 @@ uint64_t cycles(double time, int io_freq)
   return result < 0 ? 0 : static_cast<uint64_t>(result);
 }
 
-MEMORY_CONTROLLER::MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround,
-                                     std::vector<channel_type*>&& ul, int is_slow)
-    : champsim::operable(freq_scale), queues(std::move(ul)), tRP(cycles(t_rp / 1000, io_freq)), tRCD(cycles(t_rcd / 1000, io_freq)),
-      tCAS(cycles(t_cas / 1000, io_freq)), DRAM_DBUS_TURN_AROUND_TIME(cycles(turnaround / 1000, io_freq)),
-      isSlow(is_slow)
+// MEMORY_CONTROLLER::MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround,
+//                                      std::vector<channel_type*>&& ul, int is_slow)
+MEMORY_CONTROLLER::MEMORY_CONTROLLER(double freq_scale, int _io_freq, double t_rp, double t_rcd, double t_cas, double turnaround,
+                                     std::vector<channel_type*>&& ul, std::size_t _width_channel, std::size_t _num_channel, std::size_t _wq_size , std::size_t _banks, std::size_t _ranks, 
+                                     std::size_t _columns, std::size_t _rows, int is_slow)
+    : champsim::operable(freq_scale),io_freq(_io_freq), queues(std::move(ul)), tRP(cycles(t_rp / 1000, _io_freq)), tRCD(cycles(t_rcd / 1000, _io_freq)),
+      tCAS(cycles(t_cas / 1000, _io_freq)), DRAM_DBUS_TURN_AROUND_TIME(cycles(turnaround / 1000, _io_freq)),
+      width_channel(_width_channel), num_channel(_num_channel), wq_size(_wq_size), banks(_banks), ranks(_ranks), columns(_columns), rows(_rows), isSlow(is_slow)
 {
-  if(is_slow){
-    DRAM_DBUS_RETURN_TIME = cycles(std::ceil(BLOCK_SIZE) / std::ceil(DRAM_SLOW_CHANNEL_WIDTH), 1);
-    DRAM_WRITE_HIGH_WM = ((DRAM_SLOW_WQ_SIZE * 7) >> 3);
-    DRAM_WRITE_LOW_WM = ((DRAM_SLOW_WQ_SIZE * 6) >> 3);
-    MIN_DRAM_WRITES_PER_SWITCH = ((DRAM_SLOW_WQ_SIZE * 1) >> 2);
-  }else{
-    DRAM_DBUS_RETURN_TIME = cycles(std::ceil(BLOCK_SIZE) / std::ceil(DRAM_CHANNEL_WIDTH), 1);
-    DRAM_WRITE_HIGH_WM = ((DRAM_WQ_SIZE * 7) >> 3);
-    DRAM_WRITE_LOW_WM = ((DRAM_WQ_SIZE * 6) >> 3);
-    MIN_DRAM_WRITES_PER_SWITCH = ((DRAM_WQ_SIZE * 1) >> 2);
-  }
+    DRAM_DBUS_RETURN_TIME = cycles(std::ceil(BLOCK_SIZE) / std::ceil(width_channel), 1);
+    DRAM_WRITE_HIGH_WM = ((wq_size * 7) >> 3);
+    DRAM_WRITE_LOW_WM = ((wq_size * 6) >> 3);
+    MIN_DRAM_WRITES_PER_SWITCH = ((wq_size * 1) >> 2);
 }
 
 long MEMORY_CONTROLLER::operate()
@@ -187,17 +183,14 @@ long MEMORY_CONTROLLER::operate()
       iter_next_schedule = std::min_element(std::begin(channel.RQ), std::end(channel.RQ), next_schedule);
 
     if (iter_next_schedule->has_value() && iter_next_schedule->value().event_cycle <= current_cycle) {
+      // auto op_rank = dram_get_rank(iter_next_schedule->value().address, columns, ranks, banks, num_channel);
+      // auto op_bank = dram_get_bank(iter_next_schedule->value().address, banks, num_channel);
+      // auto op_row = dram_get_row(iter_next_schedule->value().address, ranks, banks, columns, num_channel, rows);
       auto op_rank = dram_get_rank(iter_next_schedule->value().address);
       auto op_bank = dram_get_bank(iter_next_schedule->value().address);
       auto op_row = dram_get_row(iter_next_schedule->value().address);
 
-      std::size_t _dram_bank;
-      if(isSlow){
-        _dram_bank = DRAM_SLOW_BANKS;
-      }else{
-        _dram_bank = DRAM_BANKS;
-      }
-      auto op_idx = op_rank * _dram_bank + op_bank;
+      auto op_idx = op_rank * banks + op_bank;
 
       if (!channel.bank_request[op_idx].valid) {
         bool row_buffer_hit = (channel.bank_request[op_idx].open_row == op_row);
@@ -217,12 +210,10 @@ long MEMORY_CONTROLLER::operate()
 
 void MEMORY_CONTROLLER::initialize()
 {
-  long long int dram_size;
+  long long int dram_size = num_channel * ranks * banks * rows * columns * BLOCK_SIZE / 1024 / 1024; // in MiB
   if(isSlow){
-    dram_size = DRAM_SLOW_CHANNELS * DRAM_SLOW_RANKS * DRAM_SLOW_BANKS * DRAM_SLOW_ROWS * DRAM_SLOW_COLUMNS * BLOCK_SIZE / 1024 / 1024; // in MiB
     fmt::print("Off-chip SLOW DRAM Size: ");
   }else{
-    dram_size = DRAM_CHANNELS * DRAM_RANKS * DRAM_BANKS * DRAM_ROWS * DRAM_COLUMNS * BLOCK_SIZE / 1024 / 1024; // in MiB
     fmt::print("Off-chip DRAM Size: ");
   }
 
@@ -231,11 +222,12 @@ void MEMORY_CONTROLLER::initialize()
   else
     fmt::print("{} MiB", dram_size);
 
-  if(isSlow){
-    fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", DRAM_SLOW_CHANNELS, 8 * DRAM_SLOW_CHANNEL_WIDTH, DRAM_SLOW_IO_FREQ);
-  }else{
-    fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", DRAM_CHANNELS, 8 * DRAM_CHANNEL_WIDTH, DRAM_IO_FREQ);
-  }
+  fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", num_channel, 8 * width_channel, io_freq);
+  // if(isSlow){
+  //   fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", DRAM_SLOW_CHANNELS, 8 * DRAM_SLOW_CHANNEL_WIDTH, DRAM_SLOW_IO_FREQ);
+  // }else{
+  //   fmt::print(" Channels: {} Width: {}-bit Data Race: {} MT/s\n", DRAM_CHANNELS, 8 * DRAM_CHANNEL_WIDTH, DRAM_IO_FREQ);
+  // }
 }
 
 void MEMORY_CONTROLLER::begin_phase()
@@ -385,76 +377,39 @@ bool MEMORY_CONTROLLER::add_wq(const request_type& packet)
 uint32_t MEMORY_CONTROLLER::dram_get_channel(uint64_t address)
 {
   int shift = LOG2_BLOCK_SIZE;
-  if(isSlow){
-    return (address >> shift) & champsim::bitmask(champsim::lg2(DRAM_SLOW_CHANNELS));
-  }else{
-    return (address >> shift) & champsim::bitmask(champsim::lg2(DRAM_CHANNELS));
-  }
+  return (address >> shift) & champsim::bitmask(champsim::lg2(num_channel));
 }
 
+// uint32_t MEMORY_CONTROLLER::dram_get_bank(uint64_t address, std::size_t _banks, std::size_t _num_channels)
 uint32_t MEMORY_CONTROLLER::dram_get_bank(uint64_t address)
 {
-  int shift;
-  std::size_t _dram_banks;
-  if(isSlow){
-    shift = champsim::lg2(DRAM_SLOW_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_banks = DRAM_SLOW_BANKS;
-  }else{
-    shift = champsim::lg2(DRAM_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_banks = DRAM_BANKS;
-  }
-
-  return (address >> shift) & champsim::bitmask(champsim::lg2(_dram_banks));
+  int shift = champsim::lg2(num_channel) + LOG2_BLOCK_SIZE;
+  return (address >> shift) & champsim::bitmask(champsim::lg2(banks));
 }
 
+// uint32_t MEMORY_CONTROLLER::dram_get_column(uint64_t address, std::size_t _banks, std::size_t _num_channels, std::size_t _columns)
 uint32_t MEMORY_CONTROLLER::dram_get_column(uint64_t address)
 {
-  int shift;
-  std::size_t _dram_columns;
-  if(isSlow){
-    shift = champsim::lg2(DRAM_SLOW_BANKS) + champsim::lg2(DRAM_SLOW_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_columns = DRAM_SLOW_COLUMNS;
-  }else{
-    shift = champsim::lg2(DRAM_BANKS) + champsim::lg2(DRAM_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_columns = DRAM_COLUMNS;
-  }
-  return (address >> shift) & champsim::bitmask(champsim::lg2(_dram_columns));
+  int shift = champsim::lg2(banks) + champsim::lg2(num_channel) + LOG2_BLOCK_SIZE;
+  return (address >> shift) & champsim::bitmask(champsim::lg2(columns));
 }
 
+// uint32_t MEMORY_CONTROLLER::dram_get_rank(uint64_t address, std::size_t _columns, std::size_t _ranks, std::size_t _banks, std::size_t _num_channels)
 uint32_t MEMORY_CONTROLLER::dram_get_rank(uint64_t address)
 {
-  int shift;
-  std::size_t _dram_ranks;
-  if(isSlow){
-    shift = champsim::lg2(DRAM_SLOW_COLUMNS) + champsim::lg2(DRAM_SLOW_BANKS) + champsim::lg2(DRAM_SLOW_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_ranks = DRAM_SLOW_RANKS;
-  }else{
-    shift = champsim::lg2(DRAM_COLUMNS) + champsim::lg2(DRAM_BANKS) + champsim::lg2(DRAM_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_ranks = DRAM_RANKS;
-  }
-  return (address >> shift) & champsim::bitmask(champsim::lg2(_dram_ranks));
+  int shift = champsim::lg2(columns) + champsim::lg2(banks) + champsim::lg2(num_channel) + LOG2_BLOCK_SIZE;
+  return (address >> shift) & champsim::bitmask(champsim::lg2(ranks));
 }
 
+// uint32_t MEMORY_CONTROLLER::dram_get_row(uint64_t address, std::size_t _ranks, std::size_t _banks, std::size_t _columns, std::size_t _num_channels, std::size_t _rows)
 uint32_t MEMORY_CONTROLLER::dram_get_row(uint64_t address)
 {
-  int shift;
-  std::size_t _dram_rows;
-  if(isSlow){
-    shift = champsim::lg2(DRAM_SLOW_RANKS) + champsim::lg2(DRAM_SLOW_BANKS) + champsim::lg2(DRAM_SLOW_COLUMNS) + champsim::lg2(DRAM_SLOW_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_rows = DRAM_SLOW_ROWS;
-  }else{
-    shift = champsim::lg2(DRAM_RANKS) + champsim::lg2(DRAM_BANKS) + champsim::lg2(DRAM_COLUMNS) + champsim::lg2(DRAM_CHANNELS) + LOG2_BLOCK_SIZE;
-    _dram_rows = DRAM_ROWS;
-  }
-  return (address >> shift) & champsim::bitmask(champsim::lg2(_dram_rows));
+  int shift = champsim::lg2(ranks) + champsim::lg2(banks) + champsim::lg2(columns) + champsim::lg2(num_channel) + LOG2_BLOCK_SIZE;
+  return (address >> shift) & champsim::bitmask(champsim::lg2(rows));
 }
 
 std::size_t MEMORY_CONTROLLER::size() const {
-  if(isSlow){
-   return DRAM_SLOW_CHANNELS * DRAM_SLOW_RANKS * DRAM_SLOW_BANKS * DRAM_SLOW_ROWS * DRAM_SLOW_COLUMNS * BLOCK_SIZE; 
-  }else{
-   return DRAM_CHANNELS * DRAM_RANKS * DRAM_BANKS * DRAM_ROWS * DRAM_COLUMNS * BLOCK_SIZE; 
-  }
+  return num_channel * ranks * banks * rows * columns * BLOCK_SIZE;
 }
 
 // LCOV_EXCL_START Exclude the following function from LCOV

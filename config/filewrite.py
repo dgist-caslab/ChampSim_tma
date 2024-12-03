@@ -77,8 +77,17 @@ class FileWriter:
         executable, elements, modules_to_compile, module_info, config_file, env = parsed_config
 
 
-        self.fileparts.append((os.path.join(inc_dir, instantiation_file_name), instantiation_file.get_instantiation_lines(**elements))) # Instantiation file
-        self.fileparts.append((os.path.join(inc_dir, constants_file_name), constants_file.get_constants_file(config_file, elements['pmem'], elements['spmem']))) # Constants header
+        # print **elements
+        if 'spmem' in elements:
+            self.fileparts.append((os.path.join(inc_dir, instantiation_file_name), instantiation_file.get_instantiation_lines_slow(**elements))) # Instantiation file
+        else:
+            self.fileparts.append((os.path.join(inc_dir, instantiation_file_name), instantiation_file.get_instantiation_lines(**elements))) # Instantiation file
+
+        # if elements have 'spmem' call get_constants_slow
+        if 'spmem' in elements:
+            self.fileparts.append((os.path.join(inc_dir, constants_file_name), constants_file.get_constants_file_slow(config_file, elements['pmem'], elements['spmem'])))
+        else:
+            self.fileparts.append((os.path.join(inc_dir, constants_file_name), constants_file.get_constants_file(config_file, elements['pmem']))) # Constants header
 
         # Core modules file
         core_declarations, core_definitions = modules.get_ooo_cpu_module_lines(module_info['branch'], module_info['btb'])

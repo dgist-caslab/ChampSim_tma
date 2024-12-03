@@ -88,13 +88,24 @@ class MEMORY_CONTROLLER : public champsim::operable
   using channel_type = champsim::channel;
   using request_type = typename channel_type::request_type;
   using response_type = typename channel_type::response_type;
+
+  // [PHW] 
+  int io_freq;
+
   std::vector<channel_type*> queues;
 
   // Latencies
   const uint64_t tRP, tRCD, tCAS, DRAM_DBUS_TURN_AROUND_TIME;
   uint64_t DRAM_DBUS_RETURN_TIME = 0;
 
-  // [PHW] slow_memory flag
+  // [PHW]
+  std::size_t width_channel;
+  std::size_t num_channel;
+  std::size_t wq_size;
+  std::size_t banks;
+  std::size_t ranks;
+  std::size_t columns;
+  std::size_t rows;
   int isSlow;
 
   // these values control when to send out a burst of writes
@@ -109,7 +120,8 @@ class MEMORY_CONTROLLER : public champsim::operable
 public:
   std::array<DRAM_CHANNEL, DRAM_CHANNELS> channels; // should be modified if slow-memory's channel has multiple channel
 
-  MEMORY_CONTROLLER(double freq_scale, int io_freq, double t_rp, double t_rcd, double t_cas, double turnaround, std::vector<channel_type*>&& ul, int is_slow);
+  MEMORY_CONTROLLER(double freq_scale, int _io_freq, double t_rp, double t_rcd, double t_cas, double turnaround, std::vector<channel_type*>&& ul,
+                    std::size_t _width_channel, std::size_t _num_channel, std::size_t _wq_size, std::size_t _banks, std::size_t _ranks, std::size_t _columns, std::size_t _rows, int is_slow);
 
   void initialize() override final;
   long operate() override final;
@@ -124,6 +136,12 @@ public:
   uint32_t dram_get_bank(uint64_t address);
   uint32_t dram_get_row(uint64_t address);
   uint32_t dram_get_column(uint64_t address);
+
+  // uint32_t dram_get_channel(uint64_t address, std::size_t num_channels);
+  // uint32_t dram_get_rank(uint64_t address, std::size_t columns, std::size_t ranks, std::size_t banks, std::size_t num_channels);
+  // uint32_t dram_get_bank(uint64_t address, std::size_t banks, std::size_t num_channels);
+  // uint32_t dram_get_row(uint64_t address, std::size_t ranks, std::size_t banks, std::size_t columns, std::size_t num_channels, std::size_t rows);
+  // uint32_t dram_get_column(uint64_t address, std::size_t banks, std::size_t num_channels, std::size_t columns);
 };
 
 #endif

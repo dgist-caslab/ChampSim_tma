@@ -100,7 +100,7 @@ uint64_t VirtualMemory::get_last_ppage_slow() { return next_ppage_slow; }
 
 std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t vaddr)
 {
-  bool is_slow = false;
+  bool is_slow = true;
   // if(tma_idx[cpu_num] % tma_thd == 0){
   //   is_slow = false;
   // }
