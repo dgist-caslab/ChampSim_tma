@@ -19,6 +19,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include <string>
 
 #include "champsim.h"
 #include "champsim_constants.h"
@@ -46,6 +47,7 @@ int main(int argc, char** argv)
   uint64_t simulation_instructions = std::numeric_limits<uint64_t>::max();
   std::string json_file_name;
   std::vector<std::string> trace_names;
+  std::vector<std::string> trace_feed_names;
 
   auto set_heartbeat_callback = [&](auto) {
     for (O3_CPU& cpu : gen_environment.cpu_view())
@@ -66,6 +68,7 @@ int main(int argc, char** argv)
       app.add_option("--json", json_file_name, "The name of the file to receive JSON output. If no name is specified, stdout will be used")->expected(0, 1);
 
   app.add_option("traces", trace_names, "The paths to the traces")->required()->expected(NUM_CPUS)->check(CLI::ExistingFile);
+  app.add_option("--feeds", trace_feed_names, "The paths to the trace feeds")->expected(NUM_CPUS)->check(CLI::ExistingFile);
 
   CLI11_PARSE(app, argc, argv);
 
@@ -95,6 +98,15 @@ int main(int argc, char** argv)
 
   fmt::print("\n*** ChampSim Multicore Out-of-Order Simulator ***\nWarmup Instructions: {}\nSimulation Instructions: {}\nNumber of CPUs: {}\nPage size: {}\n\n",
              phases.at(0).length, phases.at(1).length, std::size(gen_environment.cpu_view()), PAGE_SIZE);
+
+  // [PHW] setup feeds
+  if(trace_feed_names.size() > 0){
+    if(!gen_environment.vmem_view().set_trace_and_feed(trace_feed_names, trace_names)){
+      fmt::print("ERROR: set_trace_and_feed failed\n");
+      return 1;
+    }
+    std::cout << "feed and trace files are set" << std::endl;
+  }
 
   auto phase_stats = champsim::main(gen_environment, phases, traces);
 

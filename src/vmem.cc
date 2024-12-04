@@ -24,6 +24,8 @@
 #include <fmt/core.h>
 
 #include <iostream>
+#include <filesystem>
+#include <unordered_set>
 
 VirtualMemory::VirtualMemory(uint64_t page_table_page_size, std::size_t page_table_levels, uint64_t minor_penalty, MEMORY_CONTROLLER& dram, MEMORY_CONTROLLER& dram_slow)
     : next_ppage_fast(VMEM_RESERVE_CAPACITY), last_ppage(1ull << (LOG2_PAGE_SIZE + champsim::lg2(page_table_page_size / PTE_BYTES) * page_table_levels)),
@@ -100,16 +102,32 @@ uint64_t VirtualMemory::get_last_ppage_slow() { return next_ppage_slow; }
 
 std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t vaddr)
 {
-  bool is_slow = true;
+  bool is_slow = false;
   // if(tma_idx[cpu_num] % tma_thd == 0){
   //   is_slow = false;
   // }
+  if(feed_flag){
+    auto result = tracefeeder.find(cpu_num, vaddr);
+    if(result != std::nullopt){
+      // std::cout << "vfn: " << std::hex << vaddr << ", hits: " << std::dec << std::get<1>(result.value()) << ", prefetchs: " << std::get<2>(result.value()) << ", hit_bits_accumulated: " << std::bitset<64>(std::get<3>(result.value())) << std::endl;
+
+      double prefetch_hit_rate = (double)std::get<1>(result.value()) / (double)std::get<2>(result.value());
+      int hit_cache_block = std::get<3>(result.value()).count();
+      // print both
+      if(prefetch_hit_rate > prefetch_hit_rate_thd && hit_cache_block > hit_cache_block_thd){
+        std::cout << "[cpu" << cpu_num << "]"<< "vfn: 0x"<< std::hex << (vaddr >> 12) << std::dec << "\tprefetch_hit_rate: " << prefetch_hit_rate << "\thit_cache_block: " << hit_cache_block << std::endl;
+        is_slow = true;
+      }
+    }
+  }
+
+  // [PHW] TODO: 
+  // find prefetch_hit_rate and hit_bitmap from [loaded csv]
+  // need find coresponding trace name for current cpu_num
+  // order of trace is same as cpu_num
 
   auto [ppage, fault] = vpage_to_ppage_map.insert({{cpu_num, vaddr >> LOG2_PAGE_SIZE}, ppage_front(is_slow)});
 
-  /* [PHW]TODO 241129
-  find prefetch_hit_rate and hit_bitmap from [loaded csv]
-  */
   // this vpage doesn't yet have a ppage mapping
   // so alloc new pa to va
   if (fault){
@@ -156,4 +174,48 @@ std::pair<uint64_t, uint64_t> VirtualMemory::get_pte_pa(uint32_t cpu_num, uint64
   // fmt::print("[VMEM] {} paddr: {:x} vaddr: {:x} pt_page_offset: {} translation_level: {} fault: {}\n", __func__, paddr, vaddr, offset, level, fault);
 
   return {paddr, fault ? minor_fault_penalty : 0};
+}
+
+bool VirtualMemory::set_trace_and_feed(const std::vector<std::string> fPaths, const std::vector<std::string> tPaths)
+{
+  feed_names = fPaths;
+  trace_names = tPaths;
+  std::unordered_set<std::string> fProcessedNames;
+  std::unordered_set<std::string> tProcessedNames;
+
+  for(const auto& filePath : feed_names){
+    std::string filename = std::filesystem::path(filePath).filename().string();
+    std::string feedname;
+    size_t pos = filename.find("B_");
+    if(pos != std::string::npos){
+      feedname = filename.substr(0, pos + 1);
+    }else{
+      std::cerr << "Error: feed file name format is not correct: " << filename << std::endl;
+      return false;
+    }
+    // std::cout << "feed name: " << feedname << std::endl;
+    fProcessedNames.insert(feedname);
+  }
+  for(const auto& filePath : trace_names){
+    std::string filename = std::filesystem::path(filePath).filename().string();
+    std::string tracename;
+    size_t pos = filename.find(".champsimtrace.xz");
+    if(pos != std::string::npos){
+      tracename = filename.substr(0, pos);
+    }
+    // std::cout << "trace name: " << tracename << std::endl;
+    tProcessedNames.insert(tracename);
+  }
+  // check feed for all trace or not
+  for(const auto& tname : tProcessedNames){
+    if(fProcessedNames.find(tname) == fProcessedNames.end()){
+      std::cerr << "Error: feed file for trace not found: " << tname << std::endl;
+      return false;
+    }
+  }
+  tracefeeder = champsim::tracefeeder(fPaths);
+  tracefeeder.readCSV();
+  // tracefeeder.printData();
+  feed_flag = true;
+  return true;
 }

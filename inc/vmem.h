@@ -21,6 +21,7 @@
 #include <map>
 
 #include "champsim_constants.h"
+#include "tracefeeder.h"
 
 class MEMORY_CONTROLLER;
 
@@ -48,6 +49,15 @@ private:
 
   uint64_t ppage_front(bool is_slow) const;
   void ppage_pop(uint64_t paddr);
+  std::vector<std::string> feed_names;
+  std::vector<std::string> trace_names;
+  bool feed_flag = false;
+
+  // [PHW] slow memory threshold
+  double prefetch_hit_rate_thd = 0.3;
+  int hit_cache_block_thd = 16;
+
+  champsim::tracefeeder tracefeeder;
 
 public:
   const uint64_t minor_fault_penalty;
@@ -64,6 +74,7 @@ public:
   std::pair<uint64_t, uint64_t> get_pte_pa(uint32_t cpu_num, uint64_t vaddr, std::size_t level);
   uint64_t get_last_ppage_fast();
   uint64_t get_last_ppage_slow();
+  bool set_trace_and_feed(const std::vector<std::string> fPaths, const std::vector<std::string> tPaths);
 };
 
 #endif
