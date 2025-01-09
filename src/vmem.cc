@@ -99,6 +99,7 @@ std::size_t VirtualMemory::available_ppages_slow() const {
 }
 uint64_t VirtualMemory::get_last_ppage_fast() { return next_ppage_fast; }
 uint64_t VirtualMemory::get_last_ppage_slow() { return next_ppage_slow; }
+uint64_t VirtualMemory::get_pf_in_slow() { return pf_in_slow; }
 
 std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t vaddr)
 {
@@ -107,17 +108,30 @@ std::pair<uint64_t, uint64_t> VirtualMemory::va_to_pa(uint32_t cpu_num, uint64_t
   //   is_slow = false;
   // }
   if(feed_flag){
-    auto result = tracefeeder.find(cpu_num, vaddr);
-    if(result != std::nullopt){
-      // std::cout << "vfn: " << std::hex << vaddr << ", hits: " << std::dec << std::get<1>(result.value()) << ", prefetchs: " << std::get<2>(result.value()) << ", hit_bits_accumulated: " << std::bitset<64>(std::get<3>(result.value())) << std::endl;
-
-      double prefetch_hit_rate = (double)std::get<1>(result.value()) / (double)std::get<2>(result.value());
-      int hit_cache_block = std::get<3>(result.value()).count();
-      // print both
-      if(prefetch_hit_rate > prefetch_hit_rate_thd && hit_cache_block > hit_cache_block_thd){
-        std::cout << "[cpu" << cpu_num << "]"<< "vfn: 0x"<< std::hex << (vaddr >> 12) << std::dec << "\tprefetch_hit_rate: " << prefetch_hit_rate << "\thit_cache_block: " << hit_cache_block << std::endl;
-        is_slow = true;
+    if(enable_pf && !enable_hotness){
+      auto result = tracefeeder.find(cpu_num, vaddr);
+      if(result != std::nullopt){
+        double prefetch_hit_rate = (double)std::get<1>(result.value()) / (double)std::get<2>(result.value());
+        int hit_cache_block = std::get<3>(result.value()).count();
+        // print both
+        if(prefetch_hit_rate >= prefetch_hit_rate_thd && hit_cache_block >= hit_cache_block_thd){
+          // std::cout << "[cpu" << cpu_num << "]"<< "vfn: 0x"<< std::hex << (vaddr >> 12) << std::dec << "\tprefetch_hit_rate: " << prefetch_hit_rate << "\thit_cache_block: " << hit_cache_block << std::endl;
+          pf_in_slow++;
+          is_slow = true;
+        }
       }
+    }else if(!enable_pf && enable_hotness){
+      auto result = tracefeeder.find(cpu_num, vaddr);
+      if(result != std::nullopt){
+        double hotness = std::get<4>(result.value());
+        if(hotness <= hot_thd){
+          // std::cout << "work hotness: " << hotness << std::endl;
+          // std::cout << "[cpu" << cpu_num << "]"<< "vfn: 0x"<< std::hex << (vaddr >> 12) << std::dec << "\thotness: " << hotness << std::endl;
+          pf_in_slow++;
+          is_slow = true;
+        }
+      }
+
     }
   }
 
@@ -186,7 +200,7 @@ bool VirtualMemory::set_trace_and_feed(const std::vector<std::string> fPaths, co
   for(const auto& filePath : feed_names){
     std::string filename = std::filesystem::path(filePath).filename().string();
     std::string feedname;
-    size_t pos = filename.find("B_");
+    size_t pos = filename.find("B.csv");
     if(pos != std::string::npos){
       feedname = filename.substr(0, pos + 1);
     }else{

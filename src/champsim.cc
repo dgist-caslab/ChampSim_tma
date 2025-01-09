@@ -145,6 +145,7 @@ phase_stats do_phase(phase_info phase, environment& env, std::vector<tracereader
   VirtualMemory& vmem = env.vmem_view();
   std::cout << "Allocated fast memory size: 0x" << std::hex << vmem.get_last_ppage_fast() << std::endl;
   std::cout << "Allocated slow memory size: 0x" << std::hex << vmem.get_last_ppage_slow() - DRAM_SIZE << std::endl;
+  std::cout << "Number of PF page in slow memory: " << std::dec << vmem.get_pf_in_slow() << std::endl;
 
   return stats;
 }

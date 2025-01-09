@@ -23,7 +23,7 @@ namespace champsim
     {
         private:
             std::vector<std::string> filePaths;
-            std::vector<std::unordered_map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>>>> data;
+            std::vector<std::unordered_map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>, double>>> data;
 
         public:
             tracefeeder() = default;
@@ -47,7 +47,7 @@ namespace champsim
                         return false;
                     }
 
-                    std::unordered_map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>>> fileData;
+                    std::unordered_map<uint64_t, std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>, double>> fileData;
 
                     // Read the rest of the data
                     while (std::getline(file, line)) {
@@ -56,6 +56,7 @@ namespace champsim
 
                         uint64_t vfn, pfn, hits, prefetchs;
                         std::bitset<64> hit_bits_accumulated;
+                        double hot_percentile;
 
                         // Read vfn (hex to uint64_t)
                         if (std::getline(lineStream, cell, ',') && cell.find("0x") == 0) {
@@ -97,8 +98,15 @@ namespace champsim
                             continue;
                         }
 
+                        if(std::getline(lineStream, cell, ',') && !cell.empty()) {
+                            hot_percentile = std::stol(cell);
+                        }else{
+                            std::cerr << "Error: Invalid hot_percentile format." << std::endl;
+                            continue;
+                        }
+
                         // Store the row with vfn as the key
-                        fileData[vfn] = std::make_tuple(pfn, hits, prefetchs, hit_bits_accumulated);
+                        fileData[vfn] = std::make_tuple(pfn, hits, prefetchs, hit_bits_accumulated, hot_percentile);
                     }
                     file.close();
 
@@ -109,7 +117,7 @@ namespace champsim
             }
 
             // Function to find a row given feed index and vfn key
-            std::optional<std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>>>
+            std::optional<std::tuple<uint64_t, uint64_t, uint64_t, std::bitset<64>, double>>
             find(size_t feed_idx, uint64_t vaddr) {
                 uint64_t vfn = vaddr >> 12; // vfn is the vaddr shifted right by 12 bits
                 // Check if feed index is valid
@@ -134,11 +142,12 @@ namespace champsim
                 for (size_t i = 0; i < data.size(); ++i) {
                     std::cout << "Data from file: " << filePaths[i] << std::endl;
                     for (const auto& [vfn, row] : data[i]) {
-                        const auto& [pfn, hits, prefetchs, hit_bits_accumulated] = row;
+                        const auto& [pfn, hits, prefetchs, hit_bits_accumulated, hot_percentile] = row;
                         std::cout << "vfn: 0x" << std::hex << vfn << ", pfn: 0x" << pfn
                                   << ", hits: " << std::dec << hits
                                   << ", prefetchs: " << prefetchs
-                                  << ", hit_bits_accumulated: " << hit_bits_accumulated << std::endl;
+                                  << ", hit_bits_accumulated: " << hit_bits_accumulated
+                                  << ", hot_percentile: " << std::dec << hot_percentile << std::endl;
                     }
                     std::cout << "---------------------------------" << std::endl;
                 }

@@ -52,10 +52,15 @@ private:
   std::vector<std::string> feed_names;
   std::vector<std::string> trace_names;
   bool feed_flag = false;
+  bool enable_hotness = false; 
+  bool enable_pf = true;
 
   // [PHW] slow memory threshold
-  double prefetch_hit_rate_thd = 0.3;
-  int hit_cache_block_thd = 16;
+   double prefetch_hit_rate_thd = 0.27;
+   int hit_cache_block_thd = 9;
+   double hot_thd = 50;
+
+  uint64_t pf_in_slow = 0;
 
   champsim::tracefeeder tracefeeder;
 
@@ -74,6 +79,7 @@ public:
   std::pair<uint64_t, uint64_t> get_pte_pa(uint32_t cpu_num, uint64_t vaddr, std::size_t level);
   uint64_t get_last_ppage_fast();
   uint64_t get_last_ppage_slow();
+  uint64_t get_pf_in_slow();
   bool set_trace_and_feed(const std::vector<std::string> fPaths, const std::vector<std::string> tPaths);
 };
 

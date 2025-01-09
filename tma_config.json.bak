@@ -132,8 +132,8 @@
     },
     "LLC": {
         "frequency": 4000,
-        "sets": 32768,
-        "ways": 16,
+        "sets": 16384,
+        "ways": 11,
         "rq_size": 32,
         "wq_size": 32,
         "pq_size": 32,
